@@ -1,4 +1,5 @@
-from typing import Any, Optional, Tuple, List, Set, Iterable, Mapping, Callable, Dict, Text
+from typing import Any, Optional, Tuple, List, Set, Iterable, Mapping, Callable, Dict, Text, \
+    Union
 
 from django.utils.translation import ugettext as _
 from django.conf import settings
@@ -17,11 +18,14 @@ from zerver.lib.actions import bulk_remove_subscriptions, \
     do_deactivate_stream, do_change_stream_invite_only, do_add_default_stream, \
     do_change_stream_description, do_get_streams, \
     do_remove_default_stream, get_topic_history_for_stream, \
+    do_create_default_stream_group, do_add_streams_to_default_stream_group, \
+    do_remove_streams_from_default_stream_group, do_remove_default_stream_group, \
+    do_change_default_stream_group_description, do_change_default_stream_group_name, \
     prep_stream_welcome_message
 from zerver.lib.response import json_success, json_error, json_response
 from zerver.lib.streams import access_stream_by_id, access_stream_by_name, \
     check_stream_name, check_stream_name_available, filter_stream_authorization, \
-    list_to_streams, access_stream_for_delete
+    list_to_streams, access_stream_for_delete, access_default_stream_group_by_id
 from zerver.lib.validator import check_string, check_int, check_list, check_dict, \
     check_bool, check_variable_type
 from zerver.models import UserProfile, Stream, Realm, Subscription, \
@@ -73,6 +77,62 @@ def add_default_stream(request, user_profile, stream_name=REQ()):
 
 @require_realm_admin
 @has_request_variables
+def create_default_stream_group(request: HttpRequest, user_profile: UserProfile,
+                                group_name: Text=REQ(), description: Text=REQ(),
+                                stream_names: List[Text]=REQ(validator=check_list(check_string))) -> None:
+    streams = []
+    for stream_name in stream_names:
+        (stream, recipient, sub) = access_stream_by_name(user_profile, stream_name)
+        streams.append(stream)
+    do_create_default_stream_group(user_profile.realm, group_name, description, streams)
+    return json_success()
+
+@require_realm_admin
+@has_request_variables
+def update_default_stream_group_info(request: HttpRequest, user_profile: UserProfile, group_id: int,
+                                     new_group_name: Text=REQ(validator=check_string, default=None),
+                                     new_description: Text=REQ(validator=check_string,
+                                                               default=None)) -> None:
+    if not new_group_name and not new_description:
+        return json_error(_('You must pass "new_description" or "new_group_name".'))
+
+    group = access_default_stream_group_by_id(user_profile.realm, group_id,)
+    if new_group_name is not None:
+        do_change_default_stream_group_name(user_profile.realm, group, new_group_name)
+    if new_description is not None:
+        do_change_default_stream_group_description(user_profile.realm, group, new_description)
+    return json_success()
+
+@require_realm_admin
+@has_request_variables
+def update_default_stream_group_streams(request: HttpRequest, user_profile: UserProfile,
+                                        group_id: int, op: Text=REQ(),
+                                        stream_names: List[Text]=REQ(
+                                            validator=check_list(check_string))) -> None:
+    group = access_default_stream_group_by_id(user_profile.realm, group_id,)
+    streams = []
+    for stream_name in stream_names:
+        (stream, recipient, sub) = access_stream_by_name(user_profile, stream_name)
+        streams.append(stream)
+
+    if op == 'add':
+        do_add_streams_to_default_stream_group(user_profile.realm, group, streams)
+    elif op == 'remove':
+        do_remove_streams_from_default_stream_group(user_profile.realm, group, streams)
+    else:
+        return json_error(_('Invalid value for "op". Specify one of "add" or "remove".'))
+    return json_success()
+
+@require_realm_admin
+@has_request_variables
+def remove_default_stream_group(request: HttpRequest, user_profile: UserProfile,
+                                group_id: int) -> None:
+    group = access_default_stream_group_by_id(user_profile.realm, group_id)
+    do_remove_default_stream_group(user_profile.realm, group)
+    return json_success()
+
+@require_realm_admin
+@has_request_variables
 def remove_default_stream(request, user_profile, stream_name=REQ()):
     # type: (HttpRequest, UserProfile, Text) -> HttpResponse
     (stream, recipient, sub) = access_stream_by_name(user_profile, stream_name)
@@ -107,7 +167,7 @@ def list_subscriptions_backend(request, user_profile):
     # type: (HttpRequest, UserProfile) -> HttpResponse
     return json_success({"subscriptions": gather_subscriptions(user_profile)[0]})
 
-FuncKwargPair = Tuple[Callable[..., HttpResponse], Dict[str, Iterable[Any]]]
+FuncKwargPair = Tuple[Callable[..., HttpResponse], Dict[str, Union[int, Iterable[Any]]]]
 
 @has_request_variables
 def update_subscriptions_backend(request, user_profile,

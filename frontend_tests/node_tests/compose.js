@@ -52,6 +52,7 @@ zrequire('stream_data');
 zrequire('compose_state');
 zrequire('people');
 zrequire('compose');
+zrequire('upload');
 page_params.use_websockets = false;
 
 var me = {
@@ -98,12 +99,12 @@ people.add(bob);
 
     $('#stream').select(noop);
     assert(!compose.validate_stream_message_address_info('foobar'));
-    assert.equal($('#error-msg').html(), "<p>The stream <b>foobar</b> does not exist.</p><p>Manage your subscriptions <a href='#streams/all'>on your Streams page</a>.</p>");
+    assert.equal($('#compose-error-msg').html(), "<p>The stream <b>foobar</b> does not exist.</p><p>Manage your subscriptions <a href='#streams/all'>on your Streams page</a>.</p>");
 
     sub.subscribed = false;
     stream_data.add_sub('social', sub);
     assert(!compose.validate_stream_message_address_info('social'));
-    assert.equal($('#error-msg').html(), "<p>You're not subscribed to the stream <b>social</b>.</p><p>Manage your subscriptions <a href='#streams/all'>on your Streams page</a>.</p>");
+    assert.equal($('#compose-error-msg').html(), "<p>You're not subscribed to the stream <b>social</b>.</p><p>Manage your subscriptions <a href='#streams/all'>on your Streams page</a>.</p>");
 
     global.page_params.narrow_stream = false;
     channel.post = function (payload) {
@@ -122,35 +123,35 @@ people.add(bob);
         payload.success(payload.data);
     };
     assert(!compose.validate_stream_message_address_info('Frontend'));
-    assert.equal($('#error-msg').html(), "<p>You're not subscribed to the stream <b>Frontend</b>.</p><p>Manage your subscriptions <a href='#streams/all'>on your Streams page</a>.</p>");
+    assert.equal($('#compose-error-msg').html(), "<p>You're not subscribed to the stream <b>Frontend</b>.</p><p>Manage your subscriptions <a href='#streams/all'>on your Streams page</a>.</p>");
 
     channel.post = function (payload) {
         assert.equal(payload.data.stream, 'Frontend');
         payload.error({status: 404});
     };
     assert(!compose.validate_stream_message_address_info('Frontend'));
-    assert.equal($('#error-msg').html(), "<p>The stream <b>Frontend</b> does not exist.</p><p>Manage your subscriptions <a href='#streams/all'>on your Streams page</a>.</p>");
+    assert.equal($('#compose-error-msg').html(), "<p>The stream <b>Frontend</b> does not exist.</p><p>Manage your subscriptions <a href='#streams/all'>on your Streams page</a>.</p>");
 
     channel.post = function (payload) {
         assert.equal(payload.data.stream, 'social');
         payload.error({status: 500});
     };
     assert(!compose.validate_stream_message_address_info('social'));
-    assert.equal($('#error-msg').html(), i18n.t("Error checking subscription"));
+    assert.equal($('#compose-error-msg').html(), i18n.t("Error checking subscription"));
 }());
 
 (function test_validate() {
     $("#compose-send-button").prop('disabled', false);
     $("#compose-send-button").focus();
     $("#sending-indicator").hide();
-    $("#new_message_content").select(noop);
+    $("#compose-textarea").select(noop);
     assert(!compose.validate());
     assert(!$("#sending-indicator").visible());
     assert(!$("#compose-send-button").is_focused());
     assert.equal($("#compose-send-button").prop('disabled'), false);
-    assert.equal($('#error-msg').html(), i18n.t('You have nothing to send!'));
+    assert.equal($('#compose-error-msg').html(), i18n.t('You have nothing to send!'));
 
-    $("#new_message_content").val('foobarfoobar');
+    $("#compose-textarea").val('foobarfoobar');
     var zephyr_checked = false;
     $("#zephyr-mirror-error").is = function () {
         if (!zephyr_checked) {
@@ -161,13 +162,13 @@ people.add(bob);
     };
     assert(!compose.validate());
     assert(zephyr_checked);
-    assert.equal($('#error-msg').html(), i18n.t('You need to be running Zephyr mirroring in order to send messages!'));
+    assert.equal($('#compose-error-msg').html(), i18n.t('You need to be running Zephyr mirroring in order to send messages!'));
 
     compose_state.set_message_type('private');
     compose_state.recipient('');
     $("#private_message_recipient").select(noop);
     assert(!compose.validate());
-    assert.equal($('#error-msg').html(), i18n.t('Please specify at least one recipient'));
+    assert.equal($('#compose-error-msg').html(), i18n.t('Please specify at least one recipient'));
 
     compose_state.recipient('foo@zulip.com');
     global.page_params.realm_is_zephyr_mirror_realm = true;
@@ -175,11 +176,11 @@ people.add(bob);
 
     global.page_params.realm_is_zephyr_mirror_realm = false;
     assert(!compose.validate());
-    assert.equal($('#error-msg').html(), i18n.t('The recipient foo@zulip.com is not valid', {}));
+    assert.equal($('#compose-error-msg').html(), i18n.t('The recipient foo@zulip.com is not valid', {}));
 
     compose_state.recipient('foo@zulip.com,alice@zulip.com');
     assert(!compose.validate());
-    assert.equal($('#error-msg').html(), i18n.t('The recipients foo@zulip.com,alice@zulip.com are not valid', {}));
+    assert.equal($('#compose-error-msg').html(), i18n.t('The recipients foo@zulip.com,alice@zulip.com are not valid', {}));
 
     people.add_in_realm(bob);
     compose_state.recipient('bob@example.com');
@@ -189,14 +190,14 @@ people.add(bob);
     compose_state.stream_name('');
     $("#stream").select(noop);
     assert(!compose.validate());
-    assert.equal($('#error-msg').html(), i18n.t('Please specify a stream'));
+    assert.equal($('#compose-error-msg').html(), i18n.t('Please specify a stream'));
 
     compose_state.stream_name('Denmark');
     global.page_params.realm_mandatory_topics = true;
     compose_state.subject('');
     $("#subject").select(noop);
     assert(!compose.validate());
-    assert.equal($('#error-msg').html(), i18n.t('Please specify a topic'));
+    assert.equal($('#compose-error-msg').html(), i18n.t('Please specify a topic'));
 }());
 
 (function test_get_invalid_recipient_emails() {
@@ -227,7 +228,7 @@ people.add(bob);
     compose_state.stream_name('social');
     assert(compose.validate());
     assert(!$("#compose-all-everyone").visible());
-    assert(!$("#send-status").visible());
+    assert(!$("#compose-send-status").visible());
 
     stream_data.get_subscriber_count = function (stream_name) {
         assert.equal(stream_name, 'social');
@@ -250,7 +251,7 @@ people.add(bob);
     compose_state.message_content('Hey @all');
     assert(!compose.validate());
     assert.equal($("#compose-send-button").prop('disabled'), false);
-    assert(!$("#send-status").visible());
+    assert(!$("#compose-send-status").visible());
     assert.equal(compose_content, 'compose_all_everyone_stub');
     assert($("#compose-all-everyone").visible());
 }());
@@ -258,9 +259,9 @@ people.add(bob);
 (function test_send_message_success() {
     blueslip.error = noop;
     blueslip.log = noop;
-    $("#new_message_content").val('foobarfoobar');
-    $("#new_message_content").blur();
-    $("#send-status").show();
+    $("#compose-textarea").val('foobarfoobar');
+    $("#compose-textarea").blur();
+    $("#compose-send-status").show();
     $("#compose-send-button").attr('disabled', 'disabled');
     $("#sending-indicator").show();
 
@@ -273,9 +274,9 @@ people.add(bob);
 
     compose.send_message_success(1001, 12, false);
 
-    assert.equal($("#new_message_content").val(), '');
-    assert($("#new_message_content").is_focused());
-    assert(!$("#send-status").visible());
+    assert.equal($("#compose-textarea").val(), '');
+    assert($("#compose-textarea").is_focused());
+    assert(!$("#compose-send-status").visible());
     assert.equal($("#compose-send-button").prop('disabled'), false);
     assert(!$("#sending-indicator").visible());
 
@@ -344,10 +345,10 @@ people.add(bob);
 
         // Setting message content with a host server link and we will assert
         // later that this has been converted to a relative link.
-        $("#new_message_content").val('[foobar]' +
+        $("#compose-textarea").val('[foobar]' +
                                       '(https://foo.com/user_uploads/123456)');
-        $("#new_message_content").blur();
-        $("#send-status").show();
+        $("#compose-textarea").blur();
+        $("#compose-send-status").show();
         $("#compose-send-button").attr('disabled', 'disabled');
         $("#sending-indicator").show();
 
@@ -360,9 +361,9 @@ people.add(bob);
             send_msg_ajax_post_called: 1,
         };
         assert.deepEqual(stub_state, state);
-        assert.equal($("#new_message_content").val(), '');
-        assert($("#new_message_content").is_focused());
-        assert(!$("#send-status").visible());
+        assert.equal($("#compose-textarea").val(), '');
+        assert($("#compose-textarea").is_focused());
+        assert(!$("#compose-send-status").visible());
         assert.equal($("#compose-send-button").prop('disabled'), false);
         assert(!$("#sending-indicator").visible());
     }());
@@ -440,12 +441,12 @@ people.add(bob);
 
     (function test_error_codepath_local_id_undefined() {
         stub_state = initialize_state_stub_dict();
-        $("#new_message_content").val('foobarfoobar');
-        $("#new_message_content").blur();
-        $("#send-status").show();
+        $("#compose-textarea").val('foobarfoobar');
+        $("#compose-textarea").blur();
+        $("#compose-send-status").show();
         $("#compose-send-button").attr('disabled', 'disabled');
         $("#sending-indicator").show();
-        $("#new_message_content").select(noop);
+        $("#compose-textarea").select(noop);
         echo_error_msg_checked = false;
         xhr_error_msg_checked = false;
         server_error_triggered = false;
@@ -472,11 +473,11 @@ people.add(bob);
         assert(xhr_error_msg_checked);
         assert(!echo_error_msg_checked);
         assert.equal($("#compose-send-button").prop('disabled'), false);
-        assert.equal($('#error-msg').html(),
+        assert.equal($('#compose-error-msg').html(),
                        'Error sending message: Server says 408');
-        assert.equal($("#new_message_content").val(), 'foobarfoobar');
-        assert($("#new_message_content").is_focused());
-        assert($("#send-status").visible());
+        assert.equal($("#compose-textarea").val(), 'foobarfoobar');
+        assert($("#compose-textarea").is_focused());
+        assert($("#compose-send-status").visible());
         assert.equal($("#compose-send-button").prop('disabled'), false);
         assert(!$("#sending-indicator").visible());
     }());
@@ -484,8 +485,8 @@ people.add(bob);
 
 (function test_enter_with_preview_open() {
     // Test sending a message with content.
-    $("#new_message_content").val('message me');
-    $("#new_message_content").hide();
+    $("#compose-textarea").val('message me');
+    $("#compose-textarea").hide();
     $("#undo_markdown_preview").show();
     $("#preview_message_area").show();
     $("#markdown_preview").hide();
@@ -495,19 +496,19 @@ people.add(bob);
         send_message_called = true;
     };
     compose.enter_with_preview_open();
-    assert($("#new_message_content").visible());
+    assert($("#compose-textarea").visible());
     assert(!$("#undo_markdown_preview").visible());
     assert(!$("#preview_message_area").visible());
     assert($("#markdown_preview").visible());
     assert(send_message_called);
 
     page_params.enter_sends = false;
-    $("#new_message_content").blur();
+    $("#compose-textarea").blur();
     compose.enter_with_preview_open();
-    assert($("#new_message_content").is_focused());
+    assert($("#compose-textarea").is_focused());
 
     // Test sending a message without content.
-    $("#new_message_content").val('');
+    $("#compose-textarea").val('');
     $("#preview_message_area").show();
     $("#enter_sends").prop("checked", true);
     page_params.enter_sends = true;
@@ -515,7 +516,7 @@ people.add(bob);
     compose.enter_with_preview_open();
 
     assert($("#enter_sends").prop("checked"));
-    assert.equal($("#error-msg").html(), i18n.t('You have nothing to send!'));
+    assert.equal($("#compose-error-msg").html(), i18n.t('You have nothing to send!'));
 }());
 
 (function test_finish() {
@@ -524,23 +525,23 @@ people.add(bob);
         $("#compose-send-button").prop('disabled', false);
         $("#compose-send-button").focus();
         $("#sending-indicator").hide();
-        $("#new_message_content").select(noop);
-        $("#new_message_content").val('');
+        $("#compose-textarea").select(noop);
+        $("#compose-textarea").val('');
         var res = compose.finish();
         assert.equal(res, false);
         assert(!$("#compose_invite_users").visible());
         assert(!$("#sending-indicator").visible());
         assert(!$("#compose-send-button").is_focused());
         assert.equal($("#compose-send-button").prop('disabled'), false);
-        assert.equal($('#error-msg').html(), i18n.t('You have nothing to send!'));
+        assert.equal($('#compose-error-msg').html(), i18n.t('You have nothing to send!'));
     }());
 
     (function test_when_compose_validation_succeed() {
-        $("#new_message_content").hide();
+        $("#compose-textarea").hide();
         $("#undo_markdown_preview").show();
         $("#preview_message_area").show();
         $("#markdown_preview").hide();
-        $("#new_message_content").val('foobarfoobar');
+        $("#compose-textarea").val('foobarfoobar');
         compose_state.set_message_type('private');
         compose_state.recipient('bob@example.com');
         var compose_finished_event_checked = false;
@@ -555,7 +556,7 @@ people.add(bob);
             send_message_called = true;
         };
         assert(compose.finish());
-        assert($("#new_message_content").visible());
+        assert($("#compose-textarea").visible());
         assert(!$("#undo_markdown_preview").visible());
         assert(!$("#preview_message_area").visible());
         assert($("#markdown_preview").visible());
@@ -609,7 +610,7 @@ function test_raw_file_drop(raw_drop_func) {
             compose_actions_start_checked = true;
         },
     };
-    $("#new_message_content").val('Old content ');
+    $("#compose-textarea").val('Old content ');
     var compose_ui_autosize_textarea_checked = false;
     compose_ui.autosize_textarea = function () {
         compose_ui_autosize_textarea_checked = true;
@@ -619,7 +620,7 @@ function test_raw_file_drop(raw_drop_func) {
     raw_drop_func('new contents');
 
     assert(compose_actions_start_checked);
-    assert.equal($("#new_message_content").val(), 'Old content new contents');
+    assert.equal($("#compose-textarea").val(), 'Old content new contents');
     assert(compose_ui_autosize_textarea_checked);
 }
 
@@ -630,7 +631,7 @@ function test_raw_file_drop(raw_drop_func) {
 
     var resize_watch_manual_resize_checked = false;
     resize.watch_manual_resize = function (elem) {
-        assert.equal('#new_message_content', elem);
+        assert.equal('#compose-textarea', elem);
         resize_watch_manual_resize_checked = true;
     };
     global.window = {
@@ -956,7 +957,7 @@ function test_with_mock_socket(test_params) {
                                       '.compose-all-everyone');
 
         $("#compose-all-everyone").show();
-        $("#send-status").show();
+        $("#compose-send-status").show();
 
         var compose_finish_checked = false;
         compose.finish = function () {
@@ -968,7 +969,7 @@ function test_with_mock_socket(test_params) {
         assert(container_removed);
         assert(compose_finish_checked);
         assert(!$("#compose-all-everyone").visible());
-        assert(!$("#send-status").visible());
+        assert(!$("#compose-send-status").visible());
     }());
 
     (function test_compose_invite_users_clicked() {
@@ -1062,6 +1063,63 @@ function test_with_mock_socket(test_params) {
         preventDefault: noop,
     };
 
+    (function test_stream_name_completed_triggered() {
+        var handler = $(document).get_on_handler('streamname_completed.zulip');
+
+        var data = {
+            stream: {
+                name: 'Denmark',
+            },
+        };
+
+        function test_noop_case(invite_only) {
+            compose_state.set_message_type('stream');
+            data.stream.invite_only = invite_only;
+            handler({}, data);
+            assert.equal($('#compose_private_stream_alert').visible(), false);
+        }
+
+        test_noop_case(false);
+
+        $("#compose_private").hide();
+        compose_state.set_message_type('stream');
+
+        var checks = [
+           (function () {
+               var called;
+               templates.render = function (template_name, context) {
+                   called = true;
+                   assert.equal(template_name, 'compose_private_stream_alert');
+                   assert.equal(context.stream_name, 'Denmark');
+                   return 'fake-compose_private_stream_alert-template';
+               };
+               return function () { assert(called); };
+           }()),
+
+           (function () {
+              var called;
+              $("#compose_private_stream_alert").append = function (html) {
+                  called = true;
+                  assert.equal(html, 'fake-compose_private_stream_alert-template');
+              };
+              return function () { assert(called); };
+           }()),
+        ];
+
+        data = {
+           stream: {
+               invite_only: true,
+               name: 'Denmark',
+           },
+        };
+
+        handler({}, data);
+        assert.equal($('#compose_private_stream_alert').visible(), true);
+
+        _.each(checks, function (f) { f(); });
+
+    }());
+
     (function test_attach_files_compose_clicked() {
         var handler = $("#compose")
                         .get_on_handler("click", "#attach_files");
@@ -1080,31 +1138,31 @@ function test_with_mock_socket(test_params) {
     (function test_video_link_compose_clicked() {
         // Hackishly pretend caret is the same as val, since we don't
         // have a cursor anyway.
-        $('#new_message_content').caret = function (x) {
-            $('#new_message_content').val(x);
+        $('#compose-textarea').caret = function (x) {
+            $('#compose-textarea').val(x);
         };
 
         var handler = $("#compose").get_on_handler("click", "#video_link");
-        assert.equal($('#new_message_content').val(), '');
+        assert.equal($('#compose-textarea').val(), '');
 
         handler(event);
 
         // video link ids consist of 15 random digits
         var video_link_regex = /\[Click to join video call\]\(https:\/\/meet.jit.si\/\d{15}\)/;
-        assert(video_link_regex.test($('#new_message_content').val()));
+        assert(video_link_regex.test($('#compose-textarea').val()));
     }());
 
     (function test_markdown_preview_compose_clicked() {
         // Tests setup
         function setup_visibilities() {
-            $("#new_message_content").show();
+            $("#compose-textarea").show();
             $("#markdown_preview").show();
             $("#undo_markdown_preview").hide();
             $("#preview_message_area").hide();
         }
 
         function assert_visibilities() {
-            assert(!$("#new_message_content").visible());
+            assert(!$("#compose-textarea").visible());
             assert(!$("#markdown_preview").visible());
             assert($("#undo_markdown_preview").visible());
             assert($("#preview_message_area").visible());
@@ -1161,7 +1219,7 @@ function test_with_mock_socket(test_params) {
                         .get_on_handler("click", "#markdown_preview");
 
         // Tests start here
-        $("#new_message_content").val('');
+        $("#compose-textarea").val('');
         setup_visibilities();
 
         handler(event);
@@ -1171,7 +1229,7 @@ function test_with_mock_socket(test_params) {
         assert_visibilities();
 
         var make_indicator_called = false;
-        $("#new_message_content").val('```foobarfoobar```');
+        $("#compose-textarea").val('```foobarfoobar```');
         setup_visibilities();
         setup_mock_markdown_contains_backend_only_syntax('```foobarfoobar```', true);
         loading.make_indicator = function (spinner) {
@@ -1186,7 +1244,7 @@ function test_with_mock_socket(test_params) {
         assert_visibilities();
 
         var apply_markdown_called = false;
-        $("#new_message_content").val('foobarfoobar');
+        $("#compose-textarea").val('foobarfoobar');
         setup_visibilities();
         setup_mock_markdown_contains_backend_only_syntax('foobarfoobar', false);
         mock_channel_post('foobarfoobar');
@@ -1208,171 +1266,19 @@ function test_with_mock_socket(test_params) {
         var handler = $("#compose")
                         .get_on_handler("click", "#undo_markdown_preview");
 
-        $("#new_message_content").hide();
+        $("#compose-textarea").hide();
         $("#undo_markdown_preview").show();
         $("#preview_message_area").show();
         $("#markdown_preview").hide();
 
         handler(event);
 
-        assert($("#new_message_content").visible());
+        assert($("#compose-textarea").visible());
         assert(!$("#undo_markdown_preview").visible());
         assert(!$("#preview_message_area").visible());
         assert($("#markdown_preview").visible());
     }());
 
-}());
-
-(function test_upload_started() {
-    $("#compose-send-button").prop('disabled', false);
-    $("#send-status").removeClass("alert-info").hide();
-    $(".send-status-close").one = function (ev_name, handler) {
-        assert.equal(ev_name, 'click');
-        assert(handler);
-    };
-    $("#error-msg").html('');
-    var test_html = '<div class="progress progress-striped active">' +
-                    '<div class="bar" id="upload-bar" style="width: 00%;">' +
-                    '</div></div>';
-    $("<p>").after = function (html) {
-        assert.equal(html, test_html);
-        return 'fake-html';
-    };
-
-    compose.uploadStarted();
-
-    assert.equal($("#compose-send-button").attr("disabled"), '');
-    assert($("#send-status").hasClass("alert-info"));
-    assert($("#send-status").visible());
-    assert.equal($("<p>").text(), 'translated: Uploading…');
-    assert.equal($("#error-msg").html(), 'fake-html');
-}());
-
-(function test_progress_updated() {
-    var width_update_checked = false;
-    $("#upload-bar").width = function (width_percent) {
-        assert.equal(width_percent, '39%');
-        width_update_checked = true;
-    };
-    compose.progressUpdated(1, '', 39);
-    assert(width_update_checked);
-}());
-
-(function test_upload_error() {
-    function setup_test() {
-        $("#send-status").removeClass("alert-error");
-        $("#send-status").addClass("alert-info");
-        $("#compose-send-button").attr("disabled", 'disabled');
-        $("#error-msg").text('');
-    }
-
-    function assert_side_effects(msg, check_html=false) {
-        assert($("#send-status").hasClass("alert-error"));
-        assert(!$("#send-status").hasClass("alert-info"));
-        assert.equal($("#compose-send-button").prop("disabled"), false);
-        if (check_html) {
-            assert.equal($("#error-msg").html(), msg);
-        } else {
-            assert.equal($("#error-msg").text(), msg);
-        }
-    }
-
-    function test(err, file, msg) {
-        setup_test();
-        compose.uploadError(err, file);
-        // The text function and html function in zjquery is not in sync
-        // with each other. QuotaExceeded changes html while all other errors
-        // changes body.
-        if (err === 'QuotaExceeded') {
-            assert_side_effects(msg, true);
-        } else {
-            assert_side_effects(msg);
-        }
-    }
-
-    var msg_prefix = 'translated: ';
-    var msg_1 = 'File upload is not yet available for your browser.';
-    var msg_2 = 'Unable to upload that many files at once.';
-    var msg_3 = '"foobar.txt" was too large; the maximum file size is 25MiB.';
-    var msg_4 = 'Sorry, the file was too large.';
-    var msg_5 = 'Upload would exceed your maximum quota. You can delete old attachments to ' +
-                'free up space. <a href="#settings/uploaded-files">translated: Click here</a>';
-
-    var msg_6 = 'An unknown error occurred.';
-
-    test('BrowserNotSupported', {}, msg_prefix + msg_1);
-    test('TooManyFiles', {}, msg_prefix + msg_2);
-    test('FileTooLarge', {name: 'foobar.txt'}, msg_prefix + msg_3);
-    test('REQUEST ENTITY TOO LARGE', {}, msg_prefix + msg_4);
-    test('QuotaExceeded', {}, msg_prefix + msg_5);
-    test('Do-not-match-any-case', {}, msg_prefix + msg_6);
-}());
-
-(function test_upload_finish() {
-    function test(i, response, textbox_val) {
-        var compose_ui_autosize_textarea_checked = false;
-        var compose_actions_start_checked = false;
-        var clear_out_file_input_triggered = false;
-
-        function setup_clearout_file_list_func() {
-            var event = {
-                preventDefault: noop,
-            };
-            $('#compose #file_input').trigger = noop;
-            var handler = $("#compose")
-                            .get_on_handler("click", "#attach_files");
-            handler(event);
-            $('#file_input').replaceWith = function (ele) {
-                assert.equal(ele, $('#file_input'));
-                clear_out_file_input_triggered = true;
-            };
-        }
-
-        function setup() {
-            $("#new_message_content").val('');
-            compose_ui.autosize_textarea = function () {
-                compose_ui_autosize_textarea_checked = true;
-            };
-            compose_state.set_message_type();
-            global.compose_actions = {
-                start: function (msg_type) {
-                    assert.equal(msg_type, 'stream');
-                    compose_actions_start_checked = true;
-                },
-            };
-            $("#compose-send-button").attr('disabled', 'disabled');
-            $("#send-status").addClass("alert-info");
-            $("#send-status").show();
-            $('#file_input').clone = function (param) {
-                assert(param);
-                return $('#file_input');
-            };
-            setup_clearout_file_list_func();
-        }
-
-        function assert_side_effects() {
-            assert.equal($("#new_message_content").val(), textbox_val);
-            if (response.uri) {
-                assert(compose_actions_start_checked);
-                assert(compose_ui_autosize_textarea_checked);
-                assert.equal($("#compose-send-button").prop('disabled'), false);
-                assert(!$('#send-status').hasClass('alert-info'));
-                assert(!$('#send-status').visible());
-                assert(clear_out_file_input_triggered);
-            }
-        }
-
-        setup();
-        compose.uploadFinished(i, {}, response);
-        assert_side_effects();
-    }
-
-    var msg_1 = '[pasted image](https://foo.com/uploads/122456) ';
-    var msg_2 = '[foobar.jpeg](https://foo.com/user_uploads/foobar.jpeg) ';
-
-    test(-1, {}, '');
-    test(-1, {uri: 'https://foo.com/uploads/122456'}, msg_1);
-    test(1, {uri: '/user_uploads/foobar.jpeg'}, msg_2);
 }());
 
 (function test_set_focused_recipient() {
@@ -1386,7 +1292,7 @@ function test_with_mock_socket(test_params) {
     var page = {
         '#stream': 'social',
         '#subject': 'lunch',
-        '#new_message_content': 'burrito',
+        '#compose-textarea': 'burrito',
         '#private_message_recipient': 'alice@example.com,    bob@example.com',
     };
 

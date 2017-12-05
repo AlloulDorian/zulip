@@ -6,6 +6,7 @@ zrequire('Handlebars', 'handlebars');
 zrequire('templates');
 zrequire('typeahead_helper');
 zrequire('people');
+zrequire('user_groups');
 zrequire('stream_data');
 zrequire('composebox_typeahead');
 
@@ -97,6 +98,23 @@ global.people.add_in_realm(othello);
 global.people.add_in_realm(cordelia);
 global.people.add(deactivated_user);
 
+var hamletcharacters = {
+    name: "hamletcharacters",
+    id: 1,
+    description: "Characters of Hamlet",
+    members: [],
+};
+
+var backend = {
+    name: "Backend",
+    id: 2,
+    description: "Backend team",
+    members: [],
+};
+
+global.user_groups.add(hamletcharacters);
+global.user_groups.add(backend);
+
 (function test_add_topic() {
     ct.add_topic('Denmark', 'civil fears');
     ct.add_topic('devel', 'fading');
@@ -184,6 +202,38 @@ global.people.add(deactivated_user);
     expected_value = '@**Othello, the Moor of Venice** ';
     assert.equal(actual_value, expected_value);
 
+    fake_this.query = '@**oth';
+    fake_this.token = 'oth';
+    actual_value = ct.content_typeahead_selected.call(fake_this, othello);
+    expected_value = '@**Othello, the Moor of Venice** ';
+    assert.equal(actual_value, expected_value);
+
+    fake_this.query = '@*oth';
+    fake_this.token = 'oth';
+    actual_value = ct.content_typeahead_selected.call(fake_this, othello);
+    expected_value = '@**Othello, the Moor of Venice** ';
+    assert.equal(actual_value, expected_value);
+
+    // user group mention
+    var document_stub_group_trigger_called = false;
+    $('document-stub').trigger = function (event, params) {
+        assert.equal(event, 'usermention_completed.zulip');
+        assert.deepEqual(params, { user_group: backend });
+        document_stub_group_trigger_called = true;
+    };
+
+    fake_this.query = '@back';
+    fake_this.token = 'back';
+    actual_value = ct.content_typeahead_selected.call(fake_this, backend);
+    expected_value = '@*Backend* ';
+    assert.equal(actual_value, expected_value);
+
+    fake_this.query = '@*back';
+    fake_this.token = 'back';
+    actual_value = ct.content_typeahead_selected.call(fake_this, backend);
+    expected_value = '@*Backend* ';
+    assert.equal(actual_value, expected_value);
+
     // stream
     fake_this.completing = 'stream';
     var document_stub_trigger2_called = false;
@@ -194,6 +244,12 @@ global.people.add(deactivated_user);
     };
 
     fake_this.query = '#swed';
+    fake_this.token = 'swed';
+    actual_value = ct.content_typeahead_selected.call(fake_this, sweden_stream);
+    expected_value = '#**Sweden** ';
+    assert.equal(actual_value, expected_value);
+
+    fake_this.query = '#**swed';
     fake_this.token = 'swed';
     actual_value = ct.content_typeahead_selected.call(fake_this, sweden_stream);
     expected_value = '#**Sweden** ';
@@ -236,6 +292,7 @@ global.people.add(deactivated_user);
     assert(autosize_called);
     assert(set_timeout_called);
     assert(document_stub_trigger1_called);
+    assert(document_stub_group_trigger_called);
     assert(document_stub_trigger2_called);
 }());
 
@@ -453,8 +510,8 @@ global.people.add(deactivated_user);
         pm_recipient_typeahead_called = true;
     };
 
-    var new_message_content_typeahead_called = false;
-    $('#new_message_content').typeahead = function (options) {
+    var compose_textarea_typeahead_called = false;
+    $('#compose-textarea').typeahead = function (options) {
         // options.source()
         //
         // For now we only test that compose_contents_begins_typeahead has been
@@ -464,7 +521,10 @@ global.people.add(deactivated_user);
             $element: {},
         };
         var caret_called = false;
-        fake_this.$element.caret = function () { caret_called = true; };
+        fake_this.$element.caret = function () {
+            caret_called = true;
+            return 7;
+        };
         fake_this.options = options;
         var actual_value = options.source.call(fake_this, 'test #s');
         var expected_value = stream_list;
@@ -480,6 +540,11 @@ global.people.add(deactivated_user);
         expected_value = '<strong>Othello, the Moor of Venice</strong>&nbsp;&nbsp;\n<small class="autocomplete_secondary">othello@zulip.com</small>';
         assert.equal(actual_value, expected_value);
 
+        fake_this = { completing: 'mention', token: 'hamletcharacters' };
+        actual_value = options.highlighter.call(fake_this, hamletcharacters);
+        expected_value = '<strong>hamletcharacters</strong>&nbsp;&nbsp;\n<small class="autocomplete_secondary">Characters of Hamlet</small>';
+        assert.equal(actual_value, expected_value);
+
         // options.matcher()
         fake_this = { completing: 'emoji', token: 'ta' };
         assert.equal(options.matcher.call(fake_this, emoji_tada), true);
@@ -488,6 +553,10 @@ global.people.add(deactivated_user);
         fake_this = { completing: 'mention', token: 'Cord' };
         assert.equal(options.matcher.call(fake_this, cordelia), true);
         assert.equal(options.matcher.call(fake_this, othello), false);
+
+        fake_this = { completing: 'mention', token: 'hamletchar' };
+        assert.equal(options.matcher.call(fake_this, hamletcharacters), true);
+        assert.equal(options.matcher.call(fake_this, backend), false);
 
         fake_this = { completing: 'stream', token: 'swed' };
         assert.equal(options.matcher.call(fake_this, sweden_stream), true);
@@ -511,6 +580,11 @@ global.people.add(deactivated_user);
         expected_value = [cordelia, othello];
         assert.deepEqual(actual_value, expected_value);
 
+        fake_this = { completing: 'mention', token: 'ham' };
+        actual_value = options.sorter.call(fake_this, [backend, hamletcharacters]);
+        expected_value = [hamletcharacters, backend];
+        assert.deepEqual(actual_value, expected_value);
+
         fake_this = { completing: 'stream', token: 'de' };
         actual_value = options.sorter.call(fake_this, [sweden_stream, denmark_stream]);
         expected_value = [denmark_stream, sweden_stream];
@@ -532,7 +606,7 @@ global.people.add(deactivated_user);
         fake_this = { completing: 'non-existing-completion' };
         assert.equal(options.sorter.call(fake_this), undefined);
 
-        new_message_content_typeahead_called = true;
+        compose_textarea_typeahead_called = true;
     };
 
     var pm_recipient_blur_called = false;
@@ -581,7 +655,7 @@ global.people.add(deactivated_user);
     $('#subject').data = stub_typeahead_hidden;
     $('#stream').data = stub_typeahead_hidden;
     $('#private_message_recipient').data = stub_typeahead_hidden;
-    $('#new_message_content').data = stub_typeahead_hidden;
+    $('#compose-textarea').data = stub_typeahead_hidden;
     $('form#send_message_form').keydown(event);
 
     event.keyCode = undefined;
@@ -589,16 +663,16 @@ global.people.add(deactivated_user);
     event.shiftKey = false;
     event.target.id = 'subject';
     $('form#send_message_form').keydown(event);
-    event.target.id = 'new_message_content';
+    event.target.id = 'compose-textarea';
     $('form#send_message_form').keydown(event);
     event.target.id = 'some_non_existing_id';
     $('form#send_message_form').keydown(event);
 
 
-    // Setup jquery functions used in new_message_content enter
+    // Setup jquery functions used in compose_textarea enter
     // handler.
     var range_length = 0;
-    $('#new_message_content').range = function () {
+    $('#compose-textarea').range = function () {
         return {
             length: range_length,
             range: noop,
@@ -606,12 +680,12 @@ global.people.add(deactivated_user);
             end: 0 + range_length,
         };
     };
-    $('#new_message_content').caret = noop;
+    $('#compose-textarea').caret = noop;
 
     event.keyCode = 13;
     event.target.id = 'subject';
     $('form#send_message_form').keydown(event);
-    event.target.id = 'new_message_content';
+    event.target.id = 'compose-textarea';
     page_params.enter_sends = false;
     event.metaKey = true;
     var compose_finish_called = false;
@@ -705,19 +779,29 @@ global.people.add(deactivated_user);
     assert(pm_recipient_typeahead_called);
     assert(pm_recipient_blur_called);
     assert(channel_post_called);
-    assert(new_message_content_typeahead_called);
+    assert(compose_textarea_typeahead_called);
     assert(focus_handler_called);
     assert(stream_one_called);
 }());
 
 (function test_begins_typeahead() {
-    // Stub out split_at_cursor that uses $(':focus')
-    ct.split_at_cursor = function (word) { return [word, '']; };
 
     var begin_typehead_this = {options: {completions: {
         emoji: true, mention: true, stream: true, syntax: true}}};
 
-    function assert_typeahead_equals(input, reference) {
+    function assert_typeahead_equals(input, rest, reference) {
+        // Usage:
+        // assert_typeahead_equals('#some', reference); => '#some|'
+        // assert_typeahead_equals('#some', 'thing', reference) => '#some|thing'
+        // In the above examples, '|' serves as the cursor.
+        if (reference === undefined) {
+            reference = rest;
+            rest = '';
+        }
+        // Stub out split_at_cursor that uses $(':focus')
+        ct.split_at_cursor = function () {
+            return [input, rest];
+        };
         var returned = ct.compose_content_begins_typeahead.call(
             begin_typehead_this, input
         );
@@ -740,6 +824,7 @@ global.people.add(deactivated_user);
     ];
 
     var people_with_all = global.people.get_realm_persons().concat(all_items);
+    var all_mentions = people_with_all.concat(global.user_groups.get_realm_user_groups());
     var lang_list = Object.keys(pygments_data.langs);
 
     assert_typeahead_equals("test", false);
@@ -750,24 +835,28 @@ global.people.add(deactivated_user);
     assert_typeahead_equals("test *", false);
 
     // Make sure that the last token is the one we read.
-    assert_typeahead_equals("~~~ @zulip", people_with_all);
+    assert_typeahead_equals("~~~ @zulip", all_mentions);
     assert_typeahead_equals("@zulip :ta", emoji_list);
     assert_typeahead_equals(":tada: #foo", stream_list);
     assert_typeahead_equals("#foo\n~~~py", lang_list);
 
     assert_typeahead_equals("@", false);
     assert_typeahead_equals(" @", false);
-    assert_typeahead_equals("test @**o", false);
+    assert_typeahead_equals("test @**o", all_mentions);
+    assert_typeahead_equals("test @*o", all_mentions);
+    assert_typeahead_equals("test @*h", all_mentions);
     assert_typeahead_equals("test @", false);
     assert_typeahead_equals("test no@o", false);
-    assert_typeahead_equals("@ ", people_with_all);
-    assert_typeahead_equals("test\n@i", people_with_all);
-    assert_typeahead_equals("test\n @l", people_with_all);
-    assert_typeahead_equals("@zuli", people_with_all);
-    assert_typeahead_equals("@ zuli", people_with_all);
-    assert_typeahead_equals(" @zuli", people_with_all);
-    assert_typeahead_equals("test @o", people_with_all);
-    assert_typeahead_equals("test @z", people_with_all);
+    assert_typeahead_equals("@ ", false);
+    assert_typeahead_equals("@* ", false);
+    assert_typeahead_equals("@** ", false);
+    assert_typeahead_equals("test\n@i", all_mentions);
+    assert_typeahead_equals("test\n @l", all_mentions);
+    assert_typeahead_equals("@zuli", all_mentions);
+    assert_typeahead_equals("@ zuli", false);
+    assert_typeahead_equals(" @zuli", all_mentions);
+    assert_typeahead_equals("test @o", all_mentions);
+    assert_typeahead_equals("test @z", all_mentions);
 
     assert_typeahead_equals(":", false);
     assert_typeahead_equals(": ", false);
@@ -826,6 +915,21 @@ global.people.add(deactivated_user);
     assert_typeahead_equals("~~~ f", lang_list);
     assert_typeahead_equals("test\n~~~ p", lang_list);
     assert_typeahead_equals("test\n~~~  p", lang_list);
+
+    // Following tests place the cursor before the second string
+    assert_typeahead_equals("#test", "ing", false);
+    assert_typeahead_equals("@test", "ing", false);
+    assert_typeahead_equals(":test", "ing", false);
+    assert_typeahead_equals("```test", "ing", false);
+    assert_typeahead_equals("~~~test", "ing", false);
+    var terminal_symbols = ',.?!()[] ';
+    terminal_symbols.split().forEach(symbol => {
+        assert_typeahead_equals("#test", symbol, stream_list);
+        assert_typeahead_equals("@test", symbol, all_mentions);
+        assert_typeahead_equals(":test", symbol, emoji_list);
+        assert_typeahead_equals("```test", symbol, lang_list);
+        assert_typeahead_equals("~~~test", symbol, lang_list);
+    });
 }());
 
 (function test_tokenizing() {
@@ -867,6 +971,13 @@ global.people.add(deactivated_user);
     };
     ct.content_highlighter.call(fake_this, othello);
 
+    var th_render_user_group_called = false;
+    typeahead_helper.render_user_group = function (user_group) {
+        assert.deepEqual(user_group, backend);
+        th_render_user_group_called = true;
+    };
+    ct.content_highlighter.call(fake_this, backend);
+
     fake_this = { completing: 'stream' };
     var th_render_stream_called = false;
     typeahead_helper.render_stream = function (stream) {
@@ -889,6 +1000,7 @@ global.people.add(deactivated_user);
     // Verify that all stub functions have been called.
     assert(th_render_typeahead_item_called);
     assert(th_render_person_called);
+    assert(th_render_user_group_called);
     assert(th_render_stream_called);
     assert(th_render_typeahead_item_called);
 }());

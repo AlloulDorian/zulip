@@ -14,20 +14,20 @@ from django.core import validators
 from zerver.context_processors import get_realm_from_request
 from zerver.models import UserProfile, Realm, Stream, MultiuseInvite, \
     name_changes_disabled, email_to_username, email_allowed_for_realm, \
-    get_realm, get_user_profile_by_email, get_default_stream_groups
+    get_realm, get_user, get_default_stream_groups
 from zerver.lib.send_email import send_email, FromAddress
 from zerver.lib.events import do_events_register
 from zerver.lib.actions import do_change_password, do_change_full_name, do_change_is_admin, \
     do_activate_user, do_create_user, do_create_realm, \
-    user_email_is_unique, compute_mit_user_fullname, validate_email_for_realm, \
-    do_set_user_display_setting, lookup_default_stream_groups
+    email_not_system_bot, compute_mit_user_fullname, validate_email_for_realm, \
+    do_set_user_display_setting, lookup_default_stream_groups, bulk_add_subscriptions
 from zerver.forms import RegistrationForm, HomepageForm, RealmCreationForm, \
     CreateUserForm, FindMyTeamForm
 from django_auth_ldap.backend import LDAPBackend, _LDAPUser
 from zerver.decorator import require_post, has_request_variables, \
     JsonableError, REQ, do_login
 from zerver.lib.onboarding import setup_initial_streams, \
-    setup_initial_private_stream, send_initial_realm_messages
+    send_initial_realm_messages
 from zerver.lib.response import json_success
 from zerver.lib.subdomains import get_subdomain, is_root_domain_available
 from zerver.lib.timezone import get_all_timezones
@@ -47,9 +47,28 @@ import ujson
 
 import urllib
 
+def check_prereg_key_and_redirect(request: HttpRequest, confirmation_key: str) -> HttpResponse:
+    # If the key isn't valid, show the error message on the original URL
+    confirmation = Confirmation.objects.filter(confirmation_key=confirmation_key).first()
+    if confirmation is None or confirmation.type not in [
+            Confirmation.USER_REGISTRATION, Confirmation.INVITATION, Confirmation.REALM_CREATION]:
+        return render_confirmation_key_error(
+            request, ConfirmationKeyException(ConfirmationKeyException.DOES_NOT_EXIST))
+    try:
+        get_object_from_key(confirmation_key, confirmation.type)
+    except ConfirmationKeyException as exception:
+        return render_confirmation_key_error(request, exception)
+
+    # confirm_preregistrationuser.html just extracts the confirmation_key
+    # (and GET parameters) and redirects to /accounts/register, so that the
+    # user can enter their information on a cleaner URL.
+    return render(request, 'confirmation/confirm_preregistrationuser.html',
+                  context={
+                      'key': confirmation_key,
+                      'full_name': request.GET.get("full_name", None)})
+
 @require_post
-def accounts_register(request):
-    # type: (HttpRequest) -> HttpResponse
+def accounts_register(request: HttpRequest) -> HttpResponse:
     key = request.POST['key']
     confirmation = Confirmation.objects.get(confirmation_key=key)
     prereg_user = confirmation.content_object
@@ -59,15 +78,15 @@ def accounts_register(request):
     is_realm_admin = prereg_user.invited_as_admin or realm_creation
 
     validators.validate_email(email)
-    if prereg_user.referred_by:
-        # If someone invited you, you are joining their realm regardless
-        # of your e-mail address.
-        realm = prereg_user.referred_by.realm
-    elif realm_creation:
+    if realm_creation:
         # For creating a new realm, there is no existing realm or domain
         realm = None
     else:
         realm = get_realm(get_subdomain(request))
+        if prereg_user.realm is None:
+            return render(request, 'confirmation/link_expired.html')
+        if prereg_user.realm != realm:
+            return render(request, 'confirmation/link_does_not_exist.html')
 
     if realm and not email_allowed_for_realm(email, realm):
         return render(request, "zerver/closed_realm.html",
@@ -78,11 +97,12 @@ def accounts_register(request):
         # contact support.
         return redirect_to_deactivation_notice()
 
-    try:
-        validate_email_for_realm(realm, email)
-    except ValidationError:
-        return HttpResponseRedirect(reverse('django.contrib.auth.views.login') + '?email=' +
-                                    urllib.parse.quote_plus(email))
+    if not realm_creation:
+        try:
+            validate_email_for_realm(realm, email)
+        except ValidationError:  # nocoverage # We need to add a test for this.
+            return HttpResponseRedirect(reverse('django.contrib.auth.views.login') + '?email=' +
+                                        urllib.parse.quote_plus(email))
 
     name_validated = False
     full_name = None
@@ -169,9 +189,12 @@ def accounts_register(request):
         if 'timezone' in request.POST and request.POST['timezone'] in get_all_timezones():
             timezone = request.POST['timezone']
 
-        try:
-            existing_user_profile = get_user_profile_by_email(email)
-        except UserProfile.DoesNotExist:
+        if not realm_creation:
+            try:
+                existing_user_profile = get_user(email, realm)
+            except UserProfile.DoesNotExist:
+                existing_user_profile = None
+        else:
             existing_user_profile = None
 
         return_data = {}  # type: Dict[str, bool]
@@ -191,7 +214,7 @@ def accounts_register(request):
             auth_result = authenticate(request,
                                        username=email,
                                        password=password,
-                                       realm_subdomain=realm.subdomain,
+                                       realm=realm,
                                        return_data=return_data)
             if auth_result is None:
                 # TODO: This probably isn't going to give a
@@ -220,7 +243,7 @@ def accounts_register(request):
                                           default_stream_groups=default_stream_groups)
 
         if realm_creation:
-            setup_initial_private_stream(user_profile)
+            bulk_add_subscriptions([realm.signup_notifications_stream], [user_profile])
             send_initial_realm_messages(realm)
 
         if realm_creation:
@@ -232,7 +255,7 @@ def accounts_register(request):
         # This dummy_backend check below confirms the user is
         # authenticating to the correct subdomain.
         auth_result = authenticate(username=user_profile.email,
-                                   realm_subdomain=realm.subdomain,
+                                   realm=realm,
                                    return_data=return_data,
                                    use_dummy_backend=True)
         if return_data.get('invalid_subdomain'):
@@ -266,16 +289,16 @@ def accounts_register(request):
                  }
     )
 
-def login_and_go_to_home(request, user_profile):
-    # type: (HttpRequest, UserProfile) -> HttpResponse
+def login_and_go_to_home(request: HttpRequest, user_profile: UserProfile) -> HttpResponse:
 
     # Mark the user as having been just created, so no "new login" email is sent
     user_profile.just_registered = True
     do_login(request, user_profile)
     return HttpResponseRedirect(user_profile.realm.uri + reverse('zerver.views.home.home'))
 
-def send_registration_completion_email(email, request, realm_creation=False, streams=None):
-    # type: (str, HttpRequest, bool, Optional[List[Stream]]) -> None
+def send_registration_completion_email(email: str, request: HttpRequest,
+                                       realm_creation: bool=False,
+                                       streams: Optional[List[Stream]]=None) -> None:
     """
     Send an email with a confirmation link to the provided e-mail so the user
     can complete their registration.
@@ -286,22 +309,23 @@ def send_registration_completion_email(email, request, realm_creation=False, str
         prereg_user.streams = streams
         prereg_user.save()
 
-    activation_url = create_confirmation_link(prereg_user, request.get_host(),
-                                              Confirmation.USER_REGISTRATION)
+    confirmation_type = Confirmation.USER_REGISTRATION
+    if realm_creation:
+        confirmation_type = Confirmation.REALM_CREATION
+
+    activation_url = create_confirmation_link(prereg_user, request.get_host(), confirmation_type)
     send_email('zerver/emails/confirm_registration', to_email=email, from_address=FromAddress.NOREPLY,
                context={'activate_url': activation_url})
     if settings.DEVELOPMENT and realm_creation:
         request.session['confirmation_key'] = {'confirmation_key': activation_url.split('/')[-1]}
 
-def redirect_to_email_login_url(email):
-    # type: (str) -> HttpResponseRedirect
+def redirect_to_email_login_url(email: str) -> HttpResponseRedirect:
     login_url = reverse('django.contrib.auth.views.login')
     email = urllib.parse.quote_plus(email)
     redirect_url = login_url + '?already_registered=' + email
     return HttpResponseRedirect(redirect_url)
 
-def create_realm(request, creation_key=None):
-    # type: (HttpRequest, Optional[Text]) -> HttpResponse
+def create_realm(request: HttpRequest, creation_key: Optional[Text]=None) -> HttpResponse:
     if not settings.OPEN_REALM_CREATION:
         if creation_key is None:
             return render(request, "zerver/realm_creation_failed.html",
@@ -326,12 +350,6 @@ def create_realm(request, creation_key=None):
             if (creation_key is not None and check_key_is_valid(creation_key)):
                 RealmCreationKey.objects.get(creation_key=creation_key).delete()
             return HttpResponseRedirect(reverse('send_confirm', kwargs={'email': email}))
-        try:
-            email = request.POST['email']
-            user_email_is_unique(email)
-        except ValidationError:
-            # Maybe the user is trying to log in
-            return redirect_to_email_login_url(email)
     else:
         form = RealmCreationForm()
     return render(request,
@@ -340,14 +358,15 @@ def create_realm(request, creation_key=None):
                   )
 
 # This is used only by the casper test in 00-realm-creation.js.
-def confirmation_key(request):
-    # type: (HttpRequest) -> HttpResponse
+def confirmation_key(request: HttpRequest) -> HttpResponse:
     return json_success(request.session.get('confirmation_key'))
 
-def accounts_home(request, multiuse_object=None):
-    # type: (HttpRequest, Optional[MultiuseInvite]) -> HttpResponse
+def accounts_home(request: HttpRequest, multiuse_object: Optional[MultiuseInvite]=None) -> HttpResponse:
     realm = get_realm(get_subdomain(request))
-    if realm and realm.deactivated:
+
+    if realm is None:
+        return HttpResponseRedirect(reverse('zerver.views.registration.find_account'))
+    if realm.deactivated:
         return redirect_to_deactivation_notice()
 
     from_multiuse_invite = False
@@ -383,8 +402,7 @@ def accounts_home(request, multiuse_object=None):
                            'from_multiuse_invite': from_multiuse_invite},
                   )
 
-def accounts_home_from_multiuse_invite(request, confirmation_key):
-    # type: (HttpRequest, str) -> HttpResponse
+def accounts_home_from_multiuse_invite(request: HttpRequest, confirmation_key: str) -> HttpResponse:
     multiuse_object = None
     try:
         multiuse_object = get_object_from_key(confirmation_key, Confirmation.MULTIUSE_INVITE)
@@ -396,12 +414,10 @@ def accounts_home_from_multiuse_invite(request, confirmation_key):
             return render_confirmation_key_error(request, exception)
     return accounts_home(request, multiuse_object=multiuse_object)
 
-def generate_204(request):
-    # type: (HttpRequest) -> HttpResponse
+def generate_204(request: HttpRequest) -> HttpResponse:
     return HttpResponse(content=None, status=204)
 
-def find_account(request):
-    # type: (HttpRequest) -> HttpResponse
+def find_account(request: HttpRequest) -> HttpResponse:
     url = reverse('zerver.views.registration.find_account')
 
     emails = []  # type: List[Text]

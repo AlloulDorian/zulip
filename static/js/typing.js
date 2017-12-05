@@ -5,7 +5,7 @@ var exports = {};
 // We detect changes in the compose box and notify the server
 // when we are typing.  For the inbound side see typing_events.js.
 //
-// See docs/typing-indicators.md for details on typing indicators.
+// See docs/subsystems/typing-indicators.md for details on typing indicators.
 
 function send_typing_notification_ajax(recipients, operation) {
     channel.post({
@@ -81,7 +81,7 @@ var worker = {
     notify_server_stop: notify_server_stop,
 };
 
-$(document).on('input', '#new_message_content', function () {
+$(document).on('input', '#compose-textarea', function () {
     // If our previous state was no typing notification, send a
     // start-typing notice immediately.
     typing_status.handle_text_input(worker);

@@ -103,7 +103,7 @@ class SocketConnection(sockjs.tornado.SockJSConnection):
             self.close_info = CloseErrorInfo(408, "Timeout while waiting for authentication")
             self.close()
 
-        self.timeout_handle = ioloop.add_timeout(time.time() + 10, auth_timeout)
+        self.timeout_handle = ioloop.call_later(10, auth_timeout)
         write_log_line(log_data, path='/socket/open', method='SOCKET',
                        remote_ip=info.ip, email='unknown', client_name='?')
 
@@ -222,8 +222,7 @@ class SocketConnection(sockjs.tornado.SockJSConnection):
                                                  client_id=self.client_id,
                                                  return_queue="tornado_return",
                                                  log_data=log_data,
-                                                 request_environ=request_environ)),
-                           lambda x: None, call_consume_in_tests=True)
+                                                 request_environ=request_environ)))
 
     def on_close(self) -> None:
         log_data = dict(extra='[transport=%s]' % (self.session.transport_name,))

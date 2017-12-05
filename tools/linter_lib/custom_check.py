@@ -33,10 +33,13 @@ def custom_check_file(fn, identifier, rules, color, skip_rules=None, max_length=
         line_tups.append(tup)
 
     rules_to_apply = []
-    fn_dirname = os.path.dirname(fn)
     for rule in rules:
-        exclude_list = rule.get('exclude', set())
-        if fn in exclude_list or fn_dirname in exclude_list:
+        excluded = False
+        for item in rule.get('exclude', set()):
+            if fn.startswith(item):
+                excluded = True
+                break
+        if excluded:
             continue
         if rule.get("include_only"):
             found = False
@@ -93,9 +96,12 @@ def custom_check_file(fn, identifier, rules, color, skip_rules=None, max_length=
             line_length = len(line)
         if (max_length is not None and line_length > max_length and
             '# type' not in line and 'test' not in fn and 'example' not in fn and
-            not re.match("\[[ A-Za-z0-9_:,&()-]*\]: http.*", line) and
-            not re.match("`\{\{ api_url \}\}[^`]+`", line) and
-                "#ignorelongline" not in line and 'migrations' not in fn):
+            # Don't throw errors for markdown format URLs
+            not re.search("^\[[ A-Za-z0-9_:,&()-]*\]: http.*", line) and
+            # Don't throw errors for URLs in code comments
+            not re.search("[#].*http.*", line) and
+            not re.search("`\{\{ api_url \}\}[^`]+`", line) and
+                "# ignorelongline" not in line and 'migrations' not in fn):
             print("Line too long (%s) at %s line %s: %s" % (len(line), fn, i+1, line_newline_stripped))
             failed = True
         lastLine = line
@@ -139,6 +145,9 @@ def build_custom_checkers(by_lang):
     whitespace_rules = [
         # This linter should be first since bash_rules depends on it.
         trailing_whitespace_rule,
+        {'pattern': 'http://zulip.readthedocs.io',
+         'description': 'Use HTTPS when linking to ReadTheDocs',
+         },
         {'pattern': '\t',
          'strip': '\n',
          'exclude': set(['tools/travis/success-http-headers.txt']),
@@ -199,7 +208,8 @@ def build_custom_checkers(by_lang):
                          'frontend_tests/zjsunit',
                          'frontend_tests/casper_lib/common.js',
                          'frontend_tests/node_tests',
-                         'static/js/debug.js']),
+                         'static/js/debug.js',
+                         'tools/generate-custom-icon-webfont']),
          'description': 'console.log and similar should not be used in webapp'},
         {'pattern': '[.]text\(["\'][a-zA-Z]',
          'description': 'Strings passed to $().text should be wrapped in i18n.t() for internationalization'},
@@ -223,9 +233,10 @@ def build_custom_checkers(by_lang):
         {'pattern': 'style ?=',
          'description': "Avoid using the `style=` attribute; we prefer styling in CSS files",
          'exclude': set([
-             'frontend_tests/node_tests/compose.js',
+             'frontend_tests/node_tests/copy_and_paste.js',
+             'frontend_tests/node_tests/upload.js',
              'frontend_tests/node_tests/templates.js',
-             'static/js/compose.js',
+             'static/js/upload.js',
              'static/js/dynamic_text.js',
              'static/js/stream_color.js',
          ]),
@@ -237,6 +248,14 @@ def build_custom_checkers(by_lang):
          'description': '@login_required is unsupported; use @zulip_login_required',
          'good_lines': ['@zulip_login_required', '# foo @login_required'],
          'bad_lines': ['@login_required', ' @login_required']},
+        {'pattern': '^user_profile[.]save[(][)]',
+         'description': 'Always pass update_fields when saving user_profile objects',
+         'exclude_line': set([
+             ('zerver/lib/actions.py', "user_profile.save()  # Can't use update_fields because of how the foreign key works."),
+         ]),
+         'exclude': set(['zerver/tests', 'zerver/lib/create_user.py']),
+         'good_lines': ['user_profile.save(update_fields=["pointer"])'],
+         'bad_lines': ['user_profile.save()']},
         {'pattern': '^[^"]*"[^"]*"%\(',
          'description': 'Missing space around "%"',
          'good_lines': ['"%s" % ("foo")', '"%s" % (foo)'],
@@ -374,7 +393,7 @@ def build_custom_checkers(by_lang):
              # This one in check_message is kinda terrible, since it's
              # how most instances are written, but better to exclude something than nothing
              ('zerver/lib/actions.py', 'stream = get_stream(stream_name, realm)'),
-             ('zerver/lib/actions.py', 'get_stream(signups_stream, admin_realm)'),
+             ('zerver/lib/actions.py', 'get_stream(admin_realm_signup_notifications_stream, admin_realm)'),
              # Here we need get_stream to access streams you've since unsubscribed from.
              ('zerver/views/messages.py', 'stream = get_stream(operand, self.user_profile.realm)'),
              # Use stream_id to exclude mutes.
@@ -394,12 +413,12 @@ def build_custom_checkers(by_lang):
              'zerver/migrations/0060_move_avatars_to_be_uid_based.py',
              'zerver/migrations/0104_fix_unreads.py',
          ]),
-         'description': "Don't import models or other code in migrations; see docs/schema-migrations.md",
+         'description': "Don't import models or other code in migrations; see docs/subsystems/schema-migrations.md",
          },
         {'pattern': 'datetime[.](now|utcnow)',
          'include_only': set(["zerver/", "analytics/"]),
          'description': "Don't use datetime in backend code.\n"
-         "See https://zulip.readthedocs.io/en/latest/code-style.html#naive-datetime-objects",
+         "See https://zulip.readthedocs.io/en/latest/contributing/code-style.html#naive-datetime-objects",
          },
         {'pattern': 'render_to_response\(',
          'description': "Use render() instead of render_to_response().",
@@ -452,7 +471,7 @@ def build_custom_checkers(by_lang):
          'description': "github should be spelled GitHub"},
         {'pattern': '[oO]rganisation',  # exclude usage in hrefs/divs
          'description': "Organization is spelled with a z",
-         'exclude_line': [('docs/french.md', '* organization - **organisation**')]},
+         'exclude_line': [('docs/translating/french.md', '* organization - **organisation**')]},
         {'pattern': '!!! warning',
          'description': "!!! warning is invalid; it's spelled '!!! warn'"},
         {'pattern': 'Terms of service',
@@ -467,15 +486,17 @@ def build_custom_checkers(by_lang):
                            '<td><input type="text" class="new-realm-domain" placeholder="acme.com"></input></td>')],
          'exclude': set(["static/templates/settings/emoji-settings-admin.handlebars",
                          "static/templates/settings/realm-filter-settings-admin.handlebars",
-                         "static/templates/settings/bot-settings.handlebars"])},
+                         "static/templates/settings/bot-settings.handlebars",
+                         "templates/zerver/email_log.html"])},
         {'pattern': "placeholder='[^{]",
          'description': "`placeholder` value should be translatable."},
         {'pattern': "aria-label='[^{]",
          'description': "`aria-label` value should be translatable."},
         {'pattern': 'aria-label="[^{]',
-         'description': "`aria-label` value should be translatable."},
+         'description': "`aria-label` value should be translatable.",
+         'exclude': set(["docs/_templates/layout.html"])},
         {'pattern': 'script src="http',
-         'description': "Don't directly load dependencies from CDNs.  See docs/front-end-build-process.md"},
+         'description': "Don't directly load dependencies from CDNs.  See docs/subsystems/front-end-build-process.md"},
         {'pattern': "title='[^{]",
          'description': "`title` value should be translatable."},
         {'pattern': 'title="[^{\:]',
@@ -584,13 +605,31 @@ def build_custom_checkers(by_lang):
          'description': "Period should be part of the translatable string."},
     ]
     json_rules = [
-        # Since most json files are fixtures containing 3rd party json code,
-        # we allow tab-based whitespaces.
+        # Here, we don't use `whitespace_rules`, because the tab-based
+        # whitespace rule flags a lot of third-party JSON fixtures
+        # under zerver/webhooks that we want preserved verbatim.  So
+        # we just include the trailing whitespace rule and a modified
+        # version of the tab-based whitespace rule (we can't just use
+        # exclude in whitespace_rules, since we only want to ignore
+        # JSON files with tab-based whitespace, not webhook code).
         trailing_whitespace_rule,
-    ]
+        {'pattern': '\t',
+         'strip': '\n',
+         'exclude': set(['zerver/webhooks/']),
+         'description': 'Fix tab-based whitespace'},
+    ]  # type: RuleList
     markdown_rules = markdown_whitespace_rules + prose_style_rules + [
         {'pattern': '\[(?P<url>[^\]]+)\]\((?P=url)\)',
-         'description': 'Linkified markdown URLs should use cleaner <http://example.com> syntax.'}
+         'description': 'Linkified markdown URLs should use cleaner <http://example.com> syntax.'},
+        {'pattern': 'https://zulip.readthedocs.io/en/latest/[a-zA-Z0-9]',
+         'exclude': ['docs/overview/contributing.md', 'docs/overview/readme.md'],
+         'include_only': set(['docs/']),
+         'description': "Use relatve links (../foo/bar.html) to other documents in docs/",
+         },
+        {'pattern': '\][(][^#h]',
+         'include_only': set(['README.md', 'CONTRIBUTING.md']),
+         'description': "Use absolute links from docs served by GitHub",
+         },
     ]
     help_markdown_rules = markdown_rules + [
         {'pattern': '[a-z][.][A-Z]',
@@ -608,7 +647,7 @@ def build_custom_checkers(by_lang):
         for fn in by_lang['py']:
             if 'custom_check.py' in fn:
                 continue
-            if custom_check_file(fn, 'py', python_rules, color, max_length=120):
+            if custom_check_file(fn, 'py', python_rules, color, max_length=110):
                 failed = True
         return failed
 
@@ -648,18 +687,20 @@ def build_custom_checkers(by_lang):
 
         color = next(colors)
         markdown_docs_length_exclude = {
-            "api/bots/converter/readme.md",
-            "docs/running-bots-guide.md",
-            "docs/dev-env-first-time-contributors.md",
-            "docs/webhook-walkthrough.md",
-            "docs/life-of-a-request.md",
-            "docs/logging.md",
-            "docs/migration-renumbering.md",
-            "docs/readme-symlink.md",
-            "README.md",
+            # Has some example Vagrant output that's very long
+            "docs/development/setup-vagrant.md",
+            # Have wide output in code blocks
+            "docs/subsystems/logging.md",
+            "docs/subsystems/migration-renumbering.md",
+            # Have curl commands with JSON that would be messy to wrap
             "zerver/webhooks/helloworld/doc.md",
             "zerver/webhooks/trello/doc.md",
+            # Has a very long configuration line
             "templates/zerver/integrations/perforce.md",
+            # Has some example code that could perhaps be wrapped
+            "templates/zerver/api/webhook-walkthrough.md",
+            # This macro has a long indented URL
+            "templates/zerver/help/include/git-webhook-url-with-branches-indented.md",
         }
         for fn in by_lang['md']:
             max_length = None
@@ -674,6 +715,11 @@ def build_custom_checkers(by_lang):
         color = next(colors)
         for fn in by_lang['txt'] + by_lang['text']:
             if custom_check_file(fn, 'txt', txt_rules, color):
+                failed = True
+
+        color = next(colors)
+        for fn in by_lang['rst']:
+            if custom_check_file(fn, 'rst', txt_rules, color):
                 failed = True
 
         color = next(colors)

@@ -218,11 +218,6 @@ body {
     display: block;
 }
 
-/* show two of them by default */
-.help .sidebar #guides + ul {
-    display: block;
-}
-
 .app.help .hamburger {
     display: none;
 }
@@ -299,6 +294,7 @@ body {
 .markdown ol > li > p:not(:first-child) {
     padding-left: 30px;
 }
+
 .markdown ul > li:before {
     content: none;
 }
@@ -598,7 +594,6 @@ input.text-error {
     line-height: 0.8;
 }
 
-
 .header-main .logo .light {
     display: inline-block;
     vertical-align: top;
@@ -719,9 +714,8 @@ input.text-error {
 .portico-header .dropdown-pill {
     border: 1px solid rgba(0,0,0,0.2);
     border-radius: 4px;
-
     font-weight: 400;
-
+    padding: 4px;
     cursor: pointer;
 }
 
@@ -731,8 +725,6 @@ input.text-error {
 
     margin: 0px 5px 0px -4px;
     padding: 1px 0px 1px 5px;
-
-    border-left: 1px solid rgba(0,0,0,0.2);
 
     font-size: 0.9em;
     font-weight: 600;
@@ -762,10 +754,8 @@ input.text-error {
 .portico-header .dropdown-pill .header-realm-icon {
     width: 26px;
     height: 26px;
-
     vertical-align: top;
-
-    border-radius: 4px 0px 0px 4px;
+    border-radius: 4px;
 }
 
 .app {
@@ -837,75 +827,10 @@ a.bottom-signup-button {
     box-shadow: 0px 0px 4px rgba(0,0,0,0.1);
 }
 
-.team .team-profiles {
-    text-align: center;
-    margin: 20px 0px;
-}
-
-.team {
-    margin: 50px 0px;
-}
-
-.team .profile {
-    display: inline-block;
-    text-align: center;
-
-    margin: 10px 0px;
-}
-
-.team .profile .profile-picture {
-    display: block;
-
-    width: 130px;
-    height: 130px;
-    margin: 5px 5px;
-
-    border-radius: 50%;
-
-    background-color: #444;
-
-    pointer-events: none;
-
-    box-shadow: 1px 2px 2px hsla(217, 47%, 17%, 0.03), 2px 2px 12px hsla(217, 47%, 17%, 0.09);
-}
-
-.team .profile:not(.bdfl) .profile-picture {
-    margin: 5px 13px;
-}
-
-.team .profile.bdfl {
-    display: block;
-}
-
-.team .profile.bdfl .profile-information {
-    display: inline-block;
-    vertical-align: top;
-    text-align: left;
-    font-size: 1.4em;
-
-    width: calc(100% - 215px - 10px);
-    margin-left: 10px;
-}
-
-.team .profile.bdfl .profile-description {
-    margin-top: 20px;
-
-    font-weight: 400;
-    font-size: 0.8em;
-    opacity: 0.8;
-}
-
-.team .profile.bdfl .profile-description p {
-    font-size: 1em;
-    line-height: inherit;
-}
-
-.team .profile.bdfl .profile-picture {
-    display: inline-block;
-
-    width: 200px;
-    height: auto;
-    border-radius: 4px;
+.team-profiles {
+    /* Compensate for gutter width */
+    margin: -10px;
+    margin-bottom: 20px;
 }
 
 .team .profile .profile-name {
@@ -916,13 +841,103 @@ a.bottom-signup-button {
     opacity: 0.5;
     text-transform: uppercase;
     font-size: 0.8em;
-
     font-weight: 400;
 }
 
-.authors_row {
-    width: 100%;
-    table-layout: fixed;
+.team .bdfl {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.team .bdfl .profile-picture {
+    flex: 0 auto;
+    width: 200px;
+    margin: 10px;
+}
+
+.team .bdfl .profile-picture>img {
+    height: auto;
+    border-radius: 5px;
+}
+
+.team .bdfl .profile-information {
+    flex: 1;
+    /* Wrap when screen is small to prevent very short line */
+    min-width: 300px;
+    font-size: 1.4em;
+    margin: 10px 10px 0 10px;
+}
+
+.team .bdfl .profile-description {
+    margin-top: 20px;
+    font-weight: 400;
+    font-size: 0.8em;
+    opacity: 0.8;
+}
+
+.team .core-team {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.team .core-team .profile {
+    flex: 1;
+    min-width: 130px;
+    text-align: center;
+    align-content: center;
+    margin-bottom: 20px;
+    margin: 10px;
+}
+
+.team .core-team .profile .profile-picture {
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    pointer-events: none;
+    box-shadow: 1px 2px 2px hsla(217, 47%, 17%, 0.03), 2px 2px 12px hsla(217, 47%, 17%, 0.09);
+    margin-bottom: 10px;
+}
+
+.team input {
+    display: none;
+}
+
+.team label {
+    font-size: initial;
+    display: inline-block;
+    padding: 10px;
+    border: 1px solid transparent;
+    margin: 0 0 -1px 0;
+}
+
+.team label:hover {
+    cursor: pointer;
+}
+
+.team input:checked + label {
+    border: 1px solid #eee;
+    border-top: 2px solid yellowgreen;
+    border-bottom-color: #fff;
+}
+
+.contributors {
+    display: none;
+}
+
+/* Activated .contributors */
+input#total:checked ~ #tab-total,
+input#server:checked ~ #tab-server,
+input#desktop:checked ~ #tab-desktop,
+input#mobile:checked ~ #tab-mobile,
+input#python-zulip-api:checked ~ #tab-python-zulip-api,
+input#zulipbot:checked ~ #tab-zulipbot {
+    border-top: 1px solid #eee;
+    padding-top: 20px;
+    display: grid;
+    grid-gap: 5px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
 .contributors .person a {
@@ -930,15 +945,9 @@ a.bottom-signup-button {
 }
 
 .contributors .person {
-    width: calc(33% - 20px - 2px);
-    display: inline-block;
-    vertical-align: top;
-
+    box-sizing: border-box;
     padding: 10px;
-    margin: 5px 0px;
-
     border: 1px solid #eee;
-
     border-radius: 4px;
     transition: all 0.3s ease;
 }
@@ -947,13 +956,8 @@ a.bottom-signup-button {
     border: 1px solid #bbb;
 }
 
-.contributors .person td:hover {
-    color: hsl(173, 100%, 24%);
-    box-shadow: 0px 0px 30px hsl(175, 41%, 78%);
-}
-
 .contributors .person .avatar {
-    width: 55px;
+    width: 60px;
     text-align: center;
     display: inline-block;
     vertical-align: top;
@@ -967,18 +971,18 @@ a.bottom-signup-button {
     margin-left: 10px;
 }
 
-.contributors .last-updated {
-    color: #aaa;
-    font-size: 0.8em;
-    text-align: center;
-}
-
 .avatar_img {
     width: auto;
     height: auto;
     max-width: 80%;
     max-height: 80%;
     border-radius: 20%;
+}
+
+.last-updated {
+    color: #aaa;
+    font-size: 0.8em;
+    text-align: center;
 }
 
 .integration-instruction-block .integration-lozenge {
@@ -1528,6 +1532,27 @@ input.new-organization-button {
     font-weight: 700;
 }
 
+.markdown h1:hover,
+.markdown h2:hover,
+.markdown h3:hover {
+    cursor: pointer;
+}
+
+.markdown h1:hover:after,
+.markdown h2:hover:after,
+.markdown h3:hover:after {
+    display: inline-block;
+    font: normal normal normal 16px/1 FontAwesome;
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    cursor: pointer;
+    content: "\f0c1";
+    margin-left: 5px;
+    vertical-align: middle;
+}
+
 .markdown h1,
 .why-page .main h1 {
     border-bottom: 1px solid #eee;
@@ -1743,10 +1768,6 @@ input.new-organization-button {
     .app.help .sidebar.show ~ .markdown {
         -webkit-filter: brightness(0.7);
     }
-
-    .contributors .person {
-        width: calc(50% - 20px - 4px);
-    }
 }
 
 @media (max-width: 950px) {
@@ -1757,7 +1778,6 @@ input.new-organization-button {
     .footer-navigation {
         margin-left: 0px;
     }
-
 }
 
 @media (max-width: 815px) {
@@ -1766,6 +1786,7 @@ input.new-organization-button {
         margin-left: auto;
         margin-right: auto;
     }
+
     .footer section {
         width: calc(50% - 40px);
     }
@@ -1821,6 +1842,13 @@ input.new-organization-button {
 @media (max-height: 600px) {
     .password-container {
         margin-top: 10px;
+    }
+}
+
+@media (max-width: 558px) {
+    .team .bdfl .profile-name,
+    .team .bdfl .profile-role {
+        text-align: center;
     }
 }
 
@@ -1915,7 +1943,6 @@ input.new-organization-button {
         padding-left: 6px;
         padding-right: 6px;
     }
-
 }
 
 @media (max-width: 475px) {

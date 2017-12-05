@@ -22,8 +22,7 @@ from zerver.lib.realm_icon import get_realm_icon_url
 
 from version import ZULIP_VERSION
 
-def common_context(user):
-    # type: (UserProfile) -> Dict[str, Any]
+def common_context(user: UserProfile) -> Dict[str, Any]:
     """Common context used for things like outgoing emails that don't
     have a request.
     """
@@ -34,15 +33,13 @@ def common_context(user):
         'external_host': settings.EXTERNAL_HOST,
     }
 
-def get_realm_from_request(request):
-    # type: (HttpRequest) -> Optional[Realm]
+def get_realm_from_request(request: HttpRequest) -> Optional[Realm]:
     if hasattr(request, "user") and hasattr(request.user, "realm"):
         return request.user.realm
     subdomain = get_subdomain(request)
     return get_realm(subdomain)
 
-def zulip_default_context(request):
-    # type: (HttpRequest) -> Dict[str, Any]
+def zulip_default_context(request: HttpRequest) -> Dict[str, Any]:
     """Context available to all Zulip Jinja2 templates that have a request
     passed in.  Designed to provide the long list of variables at the
     bottom of this function in a wide range of situations: logged-in
@@ -69,14 +66,12 @@ def zulip_default_context(request):
 
     register_link_disabled = settings.REGISTER_LINK_DISABLED
     login_link_disabled = settings.LOGIN_LINK_DISABLED
-    about_link_disabled = settings.ABOUT_LINK_DISABLED
     find_team_link_disabled = settings.FIND_TEAM_LINK_DISABLED
 
     if (settings.ROOT_DOMAIN_LANDING_PAGE
             and get_subdomain(request) == Realm.SUBDOMAIN_FOR_ROOT_DOMAIN):
         register_link_disabled = True
         login_link_disabled = True
-        about_link_disabled = True
         find_team_link_disabled = False
 
     apps_page_url = 'https://zulipchat.com/apps/'
@@ -106,7 +101,6 @@ def zulip_default_context(request):
         'custom_logo_url': settings.CUSTOM_LOGO_URL,
         'register_link_disabled': register_link_disabled,
         'login_link_disabled': login_link_disabled,
-        'about_link_disabled': about_link_disabled,
         'terms_of_service': settings.TERMS_OF_SERVICE,
         'privacy_policy': settings.PRIVACY_POLICY,
         'login_url': settings.HOME_NOT_LOGGED_IN,
@@ -144,8 +138,7 @@ def zulip_default_context(request):
     }
 
 
-def add_metrics(request):
-    # type: (HttpRequest) -> Dict[str, str]
+def add_metrics(request: HttpRequest) -> Dict[str, str]:
     return {
         'dropboxAppKey': settings.DROPBOX_APP_KEY
     }

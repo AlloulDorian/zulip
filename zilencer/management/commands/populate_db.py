@@ -1,26 +1,26 @@
-from django.core.management.base import BaseCommand, CommandParser
-from django.utils.timezone import now as timezone_now
-from django.db.models import F, Max
+import itertools
+import os
+import random
+from typing import Any, Callable, Dict, Iterable, List, \
+    Mapping, Optional, Sequence, Set, Text, Tuple
 
-from zerver.models import Message, UserProfile, Stream, Recipient, UserPresence, \
-    Subscription, RealmAuditLog, get_huddle, Realm, RealmEmoji, UserMessage, \
-    RealmDomain, clear_database, get_client, get_user_profile_by_id, \
-    email_to_username, Service, get_user, DefaultStream, get_stream, \
-    get_realm, get_system_bot
-
-from zerver.lib.actions import STREAM_ASSIGNMENT_COLORS, do_send_messages, \
-    do_change_is_admin
+import ujson
 from django.conf import settings
+from django.core.management.base import BaseCommand, CommandParser
+from django.db.models import F, Max
+from django.utils.timezone import now as timezone_now
+
+from zerver.lib.actions import STREAM_ASSIGNMENT_COLORS, \
+    do_change_is_admin, do_send_messages
 from zerver.lib.bulk_create import bulk_create_streams, bulk_create_users
 from zerver.lib.generate_test_data import create_test_data
 from zerver.lib.upload import upload_backend
-
-
-import random
-import os
-import ujson
-import itertools
-from typing import Any, Callable, Dict, List, Iterable, Mapping, Optional, Sequence, Set, Tuple, Text
+from zerver.lib.user_groups import create_user_group
+from zerver.models import DefaultStream, Message, Realm, RealmAuditLog, \
+    RealmDomain, RealmEmoji, Recipient, Service, Stream, Subscription, \
+    UserMessage, UserPresence, UserProfile, clear_database, \
+    email_to_username, get_client, get_huddle, get_realm, get_stream, \
+    get_system_bot, get_user, get_user_profile_by_id
 
 settings.TORNADO_SERVER = None
 # Disable using memcached caches to avoid 'unsupported pickle
@@ -30,8 +30,9 @@ settings.CACHES['default'] = {
     'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'
 }
 
-def create_users(realm, name_list, bot_type=None, bot_owner=None):
-    # type: (Realm, Iterable[Tuple[Text, Text]], Optional[int], Optional[UserProfile]) -> None
+def create_users(realm: Realm, name_list: Iterable[Tuple[Text, Text]],
+                 bot_type: Optional[int]=None,
+                 bot_owner: Optional[UserProfile]=None) -> None:
     user_set = set()  # type: Set[Tuple[Text, Text, Text, bool]]
     for full_name, email in name_list:
         short_name = email_to_username(email)
@@ -42,8 +43,7 @@ def create_users(realm, name_list, bot_type=None, bot_owner=None):
 class Command(BaseCommand):
     help = "Populate a test database"
 
-    def add_arguments(self, parser):
-        # type: (CommandParser) -> None
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument('-n', '--num-messages',
                             dest='num_messages',
                             type=int,
@@ -109,8 +109,7 @@ class Command(BaseCommand):
                             action="store_true",
                             help='Whether to delete all the existing messages.')
 
-    def handle(self, **options):
-        # type: (**Any) -> None
+    def handle(self, **options: Any) -> None:
         if options["percent_huddles"] + options["percent_personals"] > 100:
             self.stderr.write("Error!  More than 100% of messages allocated.\n")
             return
@@ -133,6 +132,10 @@ class Command(BaseCommand):
                     string_id="zephyr", name="MIT", restricted_to_domain=True,
                     invite_required=False, org_type=Realm.CORPORATE)
                 RealmDomain.objects.create(realm=mit_realm, domain="mit.edu")
+
+                lear_realm = Realm.objects.create(
+                    string_id="lear", name="Lear & Co.", restricted_to_domain=False,
+                    invite_required=False, org_type=Realm.CORPORATE)
 
             # Create test Users (UserProfiles are automatically created,
             # as are subscriptions to the ability to receive personals).
@@ -308,7 +311,11 @@ class Command(BaseCommand):
                 ]
                 create_users(mit_realm, testsuite_mit_users)
 
-            create_simple_community_realm()
+                testsuite_lear_users = [
+                    ("King Lear", "king@lear.org"),
+                    ("Cordelia Lear", "cordelia@zulip.com"),
+                ]
+                create_users(lear_realm, testsuite_lear_users)
 
             if not options["test_suite"]:
                 # Initialize the email gateway bot as an API Super User
@@ -393,11 +400,11 @@ class Command(BaseCommand):
                     UserProfile.objects.filter(id=user['user_profile_id']).update(
                         pointer=user['pointer'])
 
+            create_user_groups()
             self.stdout.write("Successfully populated test database.\n")
 
 recipient_hash = {}  # type: Dict[int, Recipient]
-def get_recipient_by_id(rid):
-    # type: (int) -> Recipient
+def get_recipient_by_id(rid: int) -> Recipient:
     if rid in recipient_hash:
         return recipient_hash[rid]
     return Recipient.objects.get(id=rid)
@@ -409,8 +416,8 @@ def get_recipient_by_id(rid):
 # - multiple personals converastions
 # - multiple messages per subject
 # - both single and multi-line content
-def send_messages(data):
-    # type: (Tuple[int, Sequence[Sequence[int]], Mapping[str, Any], Callable[[str], Any], int]) -> int
+def send_messages(data: Tuple[int, Sequence[Sequence[int]], Mapping[str, Any],
+                              Callable[[str], Any], int]) -> int:
     (tot_messages, personals_pairs, options, output, random_seed) = data
     random.seed(random_seed)
 
@@ -479,30 +486,21 @@ def send_messages(data):
             saved_data['subject'] = message.subject
 
         message.pub_date = timezone_now()
+        # We disable USING_RABBITMQ here, so that deferred work is
+        # executed in do_send_message_messages, rather than being
+        # queued.  This is important, because otherwise, if run-dev.py
+        # wasn't running when populate_db was run, a developer can end
+        # up with queued events that reference objects from a previous
+        # life of the database, which naturally throws exceptions.
+        settings.USING_RABBITMQ = False
         do_send_messages([{'message': message}])
+        settings.USING_RABBITMQ = True
 
         recipients[num_messages] = (message_type, message.recipient.id, saved_data)
         num_messages += 1
     return tot_messages
 
-def create_simple_community_realm():
-    # type: () -> None
-    simple_realm = Realm.objects.create(
-        string_id="simple", name="Simple Realm", restricted_to_domain=False,
-        invite_required=False, org_type=Realm.CORPORATE)
-
-    names = [
-        ("alice", "alice@example.com"),
-        ("bob", "bob@foo.edu"),
-        ("cindy", "cindy@foo.tv"),
-    ]
-    create_users(simple_realm, names)
-
-    user_profiles = UserProfile.objects.filter(realm__string_id='simple')
-    create_user_presences(user_profiles)
-
-def create_user_presences(user_profiles):
-    # type: (Iterable[UserProfile]) -> None
+def create_user_presences(user_profiles: Iterable[UserProfile]) -> None:
     for user in user_profiles:
         status = 1  # type: int
         date = timezone_now()
@@ -512,3 +510,11 @@ def create_user_presences(user_profiles):
             client=client,
             timestamp=date,
             status=status)
+
+def create_user_groups():
+    # type: () -> None
+    zulip = get_realm('zulip')
+    members = [get_user('cordelia@zulip.com', zulip),
+               get_user('hamlet@zulip.com', zulip)]
+    create_user_group("hamletcharacters", members, zulip,
+                      description="Characters of Hamlet")

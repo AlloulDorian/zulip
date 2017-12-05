@@ -69,6 +69,7 @@ exports.dispatch_normal_event = function dispatch_normal_event(event) {
             name: notifications.redraw_title,
             name_changes_disabled: settings_org.toggle_name_change_display,
             notifications_stream_id: noop,
+            signup_notifications_stream_id: noop,
             restricted_to_domain: noop,
             waiting_period_threshold: noop,
         };
@@ -83,6 +84,9 @@ exports.dispatch_normal_event = function dispatch_normal_event(event) {
             } else if (event.property === 'notifications_stream_id') {
                 settings_org.render_notifications_stream_ui(
                     page_params.realm_notifications_stream_id);
+            } else if (event.property === 'signup_notifications_stream_id') {
+                settings_org.render_signup_notifications_stream_ui(
+                    page_params.realm_signup_notifications_stream_id);
             }
         } else if (event.op === 'update_dict' && event.property === 'default') {
             _.each(event.data, function (value, key) {
@@ -193,6 +197,11 @@ exports.dispatch_normal_event = function dispatch_normal_event(event) {
                     settings_org.render_notifications_stream_ui(
                         page_params.realm_notifications_stream_id);
                 }
+                if (page_params.realm_signup_notifications_stream_id === stream.stream_id) {
+                    page_params.realm_signup_notifications_stream_id = -1;
+                    settings_org.render_signup_notifications_stream_ui(
+                        page_params.realm_signup_notifications_stream_id);
+                }
             });
         }
         break;
@@ -272,6 +281,7 @@ exports.dispatch_normal_event = function dispatch_normal_event(event) {
             'emoji_alt_code',
             'emojiset',
             'high_contrast_mode',
+            'night_mode',
             'left_side_userlist',
             'timezone',
             'twenty_four_hour_time',
@@ -288,6 +298,17 @@ exports.dispatch_normal_event = function dispatch_normal_event(event) {
         }
         if (event.setting_name === 'high_contrast_mode') {
             $("body").toggleClass("high-contrast");
+        }
+        if (event.setting_name === 'night_mode') {
+            $("body").fadeOut(300);
+            setTimeout(function () {
+                if (event.setting === true) {
+                    night_mode.enable();
+                } else {
+                    night_mode.disable();
+                }
+                $("body").fadeIn(300);
+            }, 300);
         }
         if (event.setting_name === 'emoji_alt_code') {
             // Rerender the whole message list UI

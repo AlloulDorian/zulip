@@ -16,6 +16,7 @@ from typing import cast, Callable, Dict, Iterable, List
 EXCLUDED_FILES = [
     ## Test data Files for testing modules in tests
     "tools/tests/test_template_data",
+    "docs/_templates",
 ]
 
 def check_our_files(modified_only, all_dups, targets):
@@ -45,6 +46,9 @@ def check_html_templates(templates, all_dups):
         lambda fn: ('casperjs' not in fn),
         templates)
     templates = sorted(list(templates))
+    # Use of underscore templates <%= %>.
+    if 'templates/zerver/team.html' in templates:
+        templates.remove('templates/zerver/team.html')
 
     template_id_dict = build_id_dict(templates)
     # TODO: Clean up these cases of duplicate ids in the code

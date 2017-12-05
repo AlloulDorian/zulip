@@ -64,7 +64,8 @@ def list_files(targets=[], ftypes=[], use_shebang=True, modified_only=False,
     # Really this is all bytes -- it's a file path -- but we get paths in
     # sys.argv as str, so that battle is already lost.  Settle for hoping
     # everything is UTF-8.
-    repository_root = subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).strip().decode('utf-8')
+    repository_root = subprocess.check_output(['git', 'rev-parse',
+                                               '--show-toplevel']).strip().decode('utf-8')
     exclude_abspaths = [os.path.abspath(os.path.join(repository_root, fpath)) for fpath in exclude]
 
     cmdline = ['git', 'ls-files'] + targets
@@ -114,9 +115,11 @@ if __name__ == "__main__":
     parser.add_argument('targets', nargs='*', default=[],
                         help='''files and directories to include in the result.
                         If this is not specified, the current directory is used''')
-    parser.add_argument('-m', '--modified', action='store_true', default=False, help='list only modified files')
+    parser.add_argument('-m', '--modified', action='store_true', default=False,
+                        help='list only modified files')
     parser.add_argument('-f', '--ftypes', nargs='+', default=[],
-                        help="list of file types to filter on. All files are included if this option is absent")
+                        help="list of file types to filter on. "
+                             "All files are included if this option is absent")
     parser.add_argument('--ext-only', dest='extonly', action='store_true', default=False,
                         help='only use extension to determine file type')
     parser.add_argument('--exclude', nargs='+', default=[],

@@ -14,7 +14,7 @@
 #streams_filter_icon,
 #join_unsub_stream {
     float: right;
-    color: hsl(0, 0%, 54%);
+    opacity: 0.50;
     font-size: 13px;
     margin-top: 3px;
     margin-left: 10px;
@@ -23,7 +23,7 @@
 #streams_inline_cog:hover,
 #streams_filter_icon:hover,
 #join_unsub_stream:hover {
-    color: hsl(0, 0%, 33%);
+    opacity: 1;
     cursor: pointer;
 }
 
@@ -101,7 +101,7 @@ ul.filters {
 }
 
 ul.filters a {
-    color: hsl(0, 0%, 20%);
+    color: inherit;
 }
 
 ul.filters hr {
@@ -122,7 +122,7 @@ li.active-sub-filter {
 }
 
 .left-sidebar .sidebar-title:hover {
-    color: hsl(0, 0%, 33%);
+    opacity: 1;
 }
 
 li.hidden-filter {
@@ -158,6 +158,8 @@ li.hidden-filter {
 .left-sidebar li {
     padding-top: 2px;
     padding-bottom: 2px;
+
+    border-radius: 4px;
 }
 
 #global_filters .global-filter i {
@@ -188,7 +190,7 @@ li.hidden-filter {
     background: hsl(105, 2%, 50%);
     padding: 1px 4px;
     border-radius: 0px;
-    color: #ffffff;
+    color: hsl(0, 0%, 100%);
     font-size: 12px;
     font-weight: normal;
     letter-spacing: 0.6px;
@@ -228,7 +230,7 @@ li.hidden-filter {
     top: 4px;
     padding: 1px 4px 1px 4px;
     background: hsl(107, 5%, 66%);
-    color: #ffffff;
+    color: hsl(0, 0%, 100%);
     border-radius: 1px;
     font-size: 12px;
     font-weight: normal;

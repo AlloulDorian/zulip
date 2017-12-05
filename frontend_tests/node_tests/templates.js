@@ -518,6 +518,19 @@ function render(template_name, args) {
     assert.equal(a.text(), "Narrow to here");
 }());
 
+(function compose_private_stream_alert() {
+    var args = {
+      stream_name: 'Denmark',
+    };
+    var html = render('compose_private_stream_alert', args);
+    assert($(html).hasClass('compose_private_stream_alert'));
+
+    var actual_text = $(html).text();
+    var expected_text = 'translated: Warning: Denmark is a private stream.';
+    assert(actual_text.indexOf(expected_text) >= 1);
+    global.write_handlebars_output("compose_stream_alert", html);
+}());
+
 (function dev_env_email_access() {
     var html = render('dev_env_email_access');
     global.write_handlebars_output("dev_env_email_access", html);
@@ -852,7 +865,10 @@ function render(template_name, args) {
 
 (function message_reaction() {
     var args = {
+        class: 'message_reaction',
         emoji_name: 'smile',
+        emoji_code: '1f604',
+        local_id: 'unicode_emoji,smile,1f604',
         message_id: '1',
     };
 
@@ -861,8 +877,10 @@ function render(template_name, args) {
     html += render('message_reaction', args);
     html += '</div>';
 
+    var reaction = $(html).find(".message_reaction");
+    assert.equal(reaction.data("reaction-id"), "unicode_emoji,smile,1f604");
+    assert(reaction.find(".emoji").hasClass("emoji-1f604"));
     global.write_handlebars_output("message_reaction", html);
-    assert($(html).find(".message_reaction").has(".emoji .emoji-smile"));
 }());
 
 (function more_topics() {

@@ -13,7 +13,8 @@ from zerver.lib.actions import do_change_password, \
     do_change_enter_sends, do_change_notification_settings, \
     do_change_default_desktop_notifications, do_change_autoscroll_forever, \
     do_regenerate_api_key, do_change_avatar_fields, do_set_user_display_setting, \
-    validate_email, do_change_user_email, do_start_email_change_process
+    validate_email, do_change_user_email, do_start_email_change_process, \
+    check_change_full_name
 from zerver.lib.avatar import avatar_url
 from zerver.lib.send_email import send_email, FromAddress
 from zerver.lib.i18n import get_available_language_codes
@@ -21,15 +22,13 @@ from zerver.lib.response import json_success, json_error
 from zerver.lib.upload import upload_avatar_image
 from zerver.lib.validator import check_bool, check_string
 from zerver.lib.request import JsonableError
-from zerver.lib.users import check_change_full_name
 from zerver.lib.timezone import get_all_timezones
 from zerver.models import UserProfile, Realm, name_changes_disabled, \
     EmailChangeStatus
 from confirmation.models import get_object_from_key, render_confirmation_key_error, \
     ConfirmationKeyException, Confirmation
 
-def confirm_email_change(request, confirmation_key):
-    # type: (HttpRequest, str) -> HttpResponse
+def confirm_email_change(request: HttpRequest, confirmation_key: str) -> HttpResponse:
     try:
         email_change_object = get_object_from_key(confirmation_key, Confirmation.EMAIL_CHANGE)
     except ConfirmationKeyException as exception:
@@ -92,7 +91,8 @@ def json_change_settings(request, user_profile,
     if new_password != "" or confirm_password != "":
         if new_password != confirm_password:
             return json_error(_("New password must match confirmation password!"))
-        if not authenticate(username=user_profile.email, password=old_password):
+        if not authenticate(username=user_profile.email, password=old_password,
+                            realm=user_profile.realm):
             return json_error(_("Wrong password!"))
         do_change_password(user_profile, new_password)
         # In Django 1.10, password changes invalidates sessions, see
@@ -137,15 +137,17 @@ def json_change_settings(request, user_profile,
 
 @human_users_only
 @has_request_variables
-def update_display_settings_backend(request, user_profile,
-                                    twenty_four_hour_time=REQ(validator=check_bool, default=None),
-                                    high_contrast_mode=REQ(validator=check_bool, default=None),
-                                    default_language=REQ(validator=check_string, default=None),
-                                    left_side_userlist=REQ(validator=check_bool, default=None),
-                                    emoji_alt_code=REQ(validator=check_bool, default=None),
-                                    emojiset=REQ(validator=check_string, default=None),
-                                    timezone=REQ(validator=check_string, default=None)):
-    # type: (HttpRequest, UserProfile, Optional[bool], Optional[bool], Optional[str], Optional[bool], Optional[bool], Optional[Text], Optional[Text]) -> HttpResponse
+def update_display_settings_backend(
+        request: HttpRequest, user_profile: UserProfile,
+        twenty_four_hour_time: Optional[bool]=REQ(validator=check_bool, default=None),
+        high_contrast_mode: Optional[bool]=REQ(validator=check_bool, default=None),
+        night_mode: Optional[bool]=REQ(validator=check_bool, default=None),
+        default_language: Optional[bool]=REQ(validator=check_string, default=None),
+        left_side_userlist: Optional[bool]=REQ(validator=check_bool, default=None),
+        emoji_alt_code: Optional[bool]=REQ(validator=check_bool, default=None),
+        emojiset: Optional[str]=REQ(validator=check_string, default=None),
+        timezone: Optional[str]=REQ(validator=check_string, default=None)) -> HttpResponse:
+
     if (default_language is not None and
             default_language not in get_available_language_codes()):
         raise JsonableError(_("Invalid language '%s'" % (default_language,)))
@@ -172,6 +174,8 @@ def update_display_settings_backend(request, user_profile,
 def json_change_notify_settings(request, user_profile,
                                 enable_stream_desktop_notifications=REQ(validator=check_bool,
                                                                         default=None),
+                                enable_stream_email_notifications=REQ(validator=check_bool,
+                                                                      default=None),
                                 enable_stream_push_notifications=REQ(validator=check_bool,
                                                                      default=None),
                                 enable_stream_sounds=REQ(validator=check_bool,
@@ -190,7 +194,7 @@ def json_change_notify_settings(request, user_profile,
                                                          default=None),
                                 pm_content_in_desktop_notifications=REQ(validator=check_bool,
                                                                         default=None)):
-    # type: (HttpRequest, UserProfile, Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[bool]) -> HttpResponse
+    # type: (HttpRequest, UserProfile, Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[bool], Optional[bool]) -> HttpResponse
     result = {}
 
     # Stream notification settings.
@@ -204,8 +208,7 @@ def json_change_notify_settings(request, user_profile,
 
     return json_success(result)
 
-def set_avatar_backend(request, user_profile):
-    # type: (HttpRequest, UserProfile) -> HttpResponse
+def set_avatar_backend(request: HttpRequest, user_profile: UserProfile) -> HttpResponse:
     if len(request.FILES) != 1:
         return json_error(_("You must upload exactly one avatar."))
 
@@ -222,8 +225,7 @@ def set_avatar_backend(request, user_profile):
     )
     return json_success(json_result)
 
-def delete_avatar_backend(request, user_profile):
-    # type: (HttpRequest, UserProfile) -> HttpResponse
+def delete_avatar_backend(request: HttpRequest, user_profile: UserProfile) -> HttpResponse:
     do_change_avatar_fields(user_profile, UserProfile.AVATAR_FROM_GRAVATAR)
     gravatar_url = avatar_url(user_profile)
 
@@ -235,8 +237,7 @@ def delete_avatar_backend(request, user_profile):
 # We don't use @human_users_only here, because there are use cases for
 # a bot regenerating its own API key.
 @has_request_variables
-def regenerate_api_key(request, user_profile):
-    # type: (HttpRequest, UserProfile) -> HttpResponse
+def regenerate_api_key(request: HttpRequest, user_profile: UserProfile) -> HttpResponse:
     do_regenerate_api_key(user_profile, user_profile)
     json_result = dict(
         api_key = user_profile.api_key

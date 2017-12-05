@@ -24,6 +24,7 @@ from zerver.models import UserProfile, Recipient, \
 
 from zerver.lib.avatar import avatar_url
 from zerver.lib.email_mirror import create_missed_message_address
+from zerver.lib.exceptions import JsonableError
 from zerver.lib.send_email import send_future_email
 from zerver.lib.actions import (
     get_emails_from_user_ids,
@@ -35,6 +36,7 @@ from zerver.lib.actions import (
 )
 from zerver.lib.topic_mutes import add_topic_mute
 from zerver.lib.stream_topic import StreamTopicTarget
+from zerver.lib.users import user_ids_to_users
 
 from django.conf import settings
 
@@ -264,6 +266,33 @@ class UserProfileTest(ZulipTestCase):
             hamlet.save(update_fields=["long_term_idle"])
 
         self.assertFalse(m.called)
+
+    def test_user_ids_to_users(self) -> None:
+        real_user_ids = [
+            self.example_user('hamlet').id,
+            self.example_user('cordelia').id,
+        ]
+
+        user_ids_to_users(real_user_ids, get_realm("zulip"))
+        with self.assertRaises(JsonableError):
+            user_ids_to_users([1234], get_realm("zephyr"))
+        with self.assertRaises(JsonableError):
+            user_ids_to_users(real_user_ids, get_realm("zephyr"))
+
+    def test_bulk_get_users(self) -> None:
+        from zerver.lib.users import bulk_get_users
+        hamlet = self.example_email("hamlet")
+        cordelia = self.example_email("cordelia")
+        webhook_bot = self.example_email("webhook_bot")
+        result = bulk_get_users([hamlet, cordelia], get_realm("zulip"))
+        self.assertEqual(result[hamlet].email, hamlet)
+        self.assertEqual(result[cordelia].email, cordelia)
+
+        result = bulk_get_users([hamlet, cordelia, webhook_bot], None,
+                                base_query=UserProfile.objects.all())
+        self.assertEqual(result[hamlet].email, hamlet)
+        self.assertEqual(result[cordelia].email, cordelia)
+        self.assertEqual(result[webhook_bot].email, webhook_bot)
 
 class ActivateTest(ZulipTestCase):
     def test_basics(self) -> None:

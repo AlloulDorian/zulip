@@ -10,6 +10,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 {% stylesheet 'portico' %}
 {% stylesheet 'landing-page' %}
+<script>
+    var contributors_list = {{ contrib|safe }};
+</script>
 {{ render_bundle('landing-page') }}
 
 {% endblock %}
@@ -28,79 +31,89 @@
     </div>
 
     <div class="main">
-        <div class="team">
-            <h1>The core team at Kandra Labs</h1>
-            <p>
-                Over 350 people have contributed to the Zulip
-                codebase, from high school students to 30 year
-                industry veterans, from people launching new careers
-                to people looking for community.
+        <div class="padded-content">
+            <div class="team">
+                <h1>The core team at Kandra Labs</h1>
+                <p>
+                    Over 350 people have contributed to the Zulip
+                    codebase, from high school students to 30 year
+                    industry veterans, from people launching new careers
+                    to people looking for community. Meet the leadership
+                    below!
+                </p>
 
-                The <a href="https://zulipchat.com/plans">commercial
-                services for Zulip</a> are offered by Kandra Labs.
-                Kandra Labs is funded by an NSF SBIR grant, and
-                employs most of the Zulip core team.  Meet the
-                leadership below!
-            </p>
+                <div class="team-profiles">
+                    <!-- Tim -->
+                    <div class="profile bdfl">
+                        <div class="profile-picture">
+                            <img src="/static/images/team/tim.png" alt="" />
+                        </div>
+                        <div class="profile-information">
+                            <div class="profile-name">Tim Abbott</div>
+                            <div class="profile-role">Founder and project leader</div>
+                            <div class="profile-description">
+                                <p>
+                                    Before Zulip, Tim was a founder and CTO of
+                                    Ksplice, which provided rebootless linux
+                                    kernel updates (a feat many previously thought
+                                    impossible) to over 100,000 production
+                                    servers. He was also the youngest ever
+                                    Architect at Oracle, one of the most senior
+                                    engineers at Dropbox and has been active in
+                                    the open source community for over a
+                                    decade. Tim has three degrees from MIT, and
+                                    lives in San Francisco with his wife and
+                                    daughter.
+                                </p>
 
-            <div class="team-profiles">
-                <!-- Tim -->
-                <div class="profile bdfl">
-                    <img class="profile-picture" src="/static/images/team/tim.png" alt="" />
-                    <div class="profile-information">
-                        <div class="profile-name">Tim Abbott</div>
-                        <div class="profile-role">Founder and project leader</div>
-                        <div class="profile-description">
-                            <p>
-                                Before Zulip, Tim was a founder and CTO of
-                                Ksplice, which provided rebootless linux
-                                kernel updates (a feat many previously thought
-                                impossible) to over 100,000 production
-                                servers. He was also the youngest ever
-                                Architect at Oracle, one of the most senior
-                                engineers at Dropbox and has been active in
-                                the open source community for over a
-                                decade. Tim has three degrees from MIT, and
-                                lives in San Francisco with his wife and
-                                daughter.
-                            </p>
-
+                            </div>
+                        </div>
+                    </div>
+                    <div class="core-team">
+                        <!-- Rishi -->
+                        <div class="profile">
+                            <img class="profile-picture" src="/static/images/team/rishi.png" alt="" />
+                            <div class="profile-name">Rishi Gupta</div>
+                            <div class="profile-role">Product</div>
+                        </div>
+                        <!-- Brock -->
+                        <div class="profile">
+                            <img class="profile-picture" src="/static/images/team/brock.jpg" alt="" />
+                            <div class="profile-name">Brock Whittaker</div>
+                            <div class="profile-role">Web</div>
+                        </div>
+                        <!-- Steve -->
+                        <div class="profile">
+                            <img class="profile-picture" src="/static/images/team/steve.png" alt="" />
+                            <div class="profile-name">Steve Howell</div>
+                            <div class="profile-role">Full Stack</div>
+                        </div>
+                        <!-- Greg -->
+                        <div class="profile">
+                            <img class="profile-picture" src="/static/images/team/greg.png" alt="" />
+                            <div class="profile-name">Greg Price</div>
+                            <div class="profile-role">Infrastructure</div>
+                        </div>
+                        <!-- Boris -->
+                        <div class="profile">
+                            <img class="profile-picture" src="/static/images/team/boris.jpg" alt="" />
+                            <div class="profile-name">Boris Yankov</div>
+                            <div class="profile-role">Mobile</div>
                         </div>
                     </div>
                 </div>
-                <!-- Rishi -->
-                <div class="profile">
-                    <img class="profile-picture" src="/static/images/team/rishi.png" alt="" />
-                    <div class="profile-name">Rishi Gupta</div>
-                    <div class="profile-role">Product</div>
-                </div>
-                <!-- Brock -->
-                <div class="profile">
-                    <img class="profile-picture" src="/static/images/team/brock.jpg" alt="" />
-                    <div class="profile-name">Brock Whittaker</div>
-                    <div class="profile-role">Web</div>
-                </div>
-                <!-- Steve -->
-                <div class="profile">
-                    <img class="profile-picture" src="/static/images/team/steve.png" alt="" />
-                    <div class="profile-name">Steve Howell</div>
-                    <div class="profile-role">Full Stack</div>
-                </div>
-                <!-- Greg -->
-                <div class="profile">
-                    <img class="profile-picture" src="/static/images/team/greg.png" alt="" />
-                    <div class="profile-name">Greg Price</div>
-                    <div class="profile-role">Infrastructure</div>
-                </div>
-                <!-- Boris -->
-                <div class="profile">
-                    <img class="profile-picture" src="/static/images/team/boris.jpg" alt="" />
-                    <div class="profile-name">Boris Yankov</div>
-                    <div class="profile-role">Mobile</div>
-                </div>
-            </div>
+                <h3>Kandra Labs</h3>
+                <p>
+                    Kandra Labs provides commercial Zulip hosting and on-premise support
+                    at <a href="https://zulipchat.com/plans">https://zulipchat.com</a>,
+                    and employs the core developers of the project. It was
+                    started in June 2016 to help sustain the growth of the Zulip
+                    project. Kandra Labs is funded by
+                    an <a href="https://seedfund.nsf.gov/">SBIR grant</a> from
+                    the US National Science Foundation.
+                </p>
 
-            <div class="contributors">
+                <!-- Contributors -->
                 <h1>Our amazing community</h1>
                 <p>
                     While the team at Kandra Labs provides important
@@ -112,30 +125,50 @@
                 </p>
                 <p>
                     Here, we recognize the top contributors to the
-                    Zulip server project on GitHub!  Zulip's community
-                    in unusual in how many people outside the core
+                    Zulip server project on GitHub.  Zulip's community
+                    is unusual in how many people outside the core
                     team have made major contributions to the project.
                 </p>
 
-                {% for row in data %}
-                    {% for group in (row[0:3], row[3:6]) %}
-                        {% for person in group %}
-                            {% if person %}
-                            <div class="person">
-                                <a href="https://github.com/{{ person.name }}" target="_blank" class="no-underline">
-                                    <div class="avatar">
-                                        <img class="avatar_img" src="{{ person.avatar }}" alt="{{ _('Avatar') }}" />
-                                    </div>
-                                    <div class='info'>
-                                        <b>@{{ person.name }}</b><br />
-                                        {{ person.commits }} commits
-                                    </div>
-                                </a>
+                <input id="total" type="radio" name="tabs" checked>
+                <label for="total"><i class="fa fa-globe" aria-hidden="true"></i>&nbsp; Top contributions</label>
+
+                <input id="server" type="radio" name="tabs">
+                <label for="server"><i class="fa fa-server" aria-hidden="true"></i>&nbsp; Zulip server</label>
+
+                <input id="desktop" type="radio" name="tabs">
+                <label for="desktop"><i class="fa fa-desktop" aria-hidden="true"></i>&nbsp; Desktop</label>
+
+                <input id="mobile" type="radio" name="tabs">
+                <label for="mobile"><i class="fa fa-mobile" aria-hidden="true"></i>&nbsp; Mobile</label>
+
+                <input id="python-zulip-api" type="radio" name="tabs">
+                <label for="python-zulip-api"><i class="fa fa-code" aria-hidden="true"></i>&nbsp; Python API</label>
+
+                <input id="zulipbot" type="radio" name="tabs">
+                <label for="zulipbot"><i class="fa fa-at" aria-hidden="true"></i>&nbsp; Zulipbot</label>
+
+                <div id="tab-total" class="contributors"></div>
+                <div id="tab-server" class="contributors"></div>
+                <div id="tab-desktop" class="contributors"></div>
+                <div id="tab-mobile" class="contributors"></div>
+                <div id="tab-python-zulip-api" class="contributors"></div>
+                <div id="tab-zulipbot" class="contributors"></div>
+
+                <!-- Compiled using underscore -->
+                <script type="text/template" id="contributors-template">
+                    <div class="person">
+                        <a href="https://github.com/<%= name %>" target="_blank" class="no-underline">
+                            <div class="avatar">
+                                <img class="avatar_img" src="<%= avatar %>" alt="{{ _('Avatar') }}" />
                             </div>
-                            {% endif %}
-                        {% endfor %}
-                    {% endfor %}
-                {% endfor %}
+                            <div class='info'>
+                                <b>@<%= name %></b><br />
+                                <%= commits %> commits
+                            </div>
+                        </a>
+                    </div>
+                </script>
 
                 <p class="last-updated">
                     Statistic last updated: {{ date }}

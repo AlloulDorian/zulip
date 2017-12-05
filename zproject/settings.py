@@ -7,7 +7,7 @@
 # * settings.py imports prod_settings.py, and any site-specific configuration
 # belongs there.  The template for prod_settings.py is prod_settings_template.py
 #
-# See http://zulip.readthedocs.io/en/latest/settings.html for more information
+# See https://zulip.readthedocs.io/en/latest/subsystems/settings.html for more information
 #
 ########################################################################
 from copy import deepcopy
@@ -159,6 +159,12 @@ DEFAULT_SETTINGS = {
     'ENABLE_FEEDBACK': PRODUCTION,
     'FEEDBACK_EMAIL': None,
 
+    # Max state storage per user
+    # TODO: Add this to zproject/prod_settings_template.py once stateful bots are fully functional.
+    'USER_STATE_SIZE_LIMIT': 10000000,
+    # Max size of a single configuration entry of an embedded bot.
+    'BOT_CONFIG_SIZE_LIMIT': 10000,
+
     # External service configuration
     'CAMO_URI': '',
     'MEMCACHED_LOCATION': '127.0.0.1:11211',
@@ -186,6 +192,9 @@ DEFAULT_SETTINGS = {
     'RATE_LIMITING': True,
     'SEND_LOGIN_EMAILS': True,
     'EMBEDDED_BOTS_ENABLED': False,
+
+    # Two Factor Authentication is not yet implementation-complete
+    'TWO_FACTOR_AUTHENTICATION_ENABLED': False,
 }
 
 # These settings are not documented in prod_settings_template.py.
@@ -219,6 +228,10 @@ DEFAULT_SETTINGS.update({
     'FEEDBACK_BOT': 'feedback@zulip.com',
     'FEEDBACK_BOT_NAME': 'Zulip Feedback Bot',
     'FEEDBACK_STREAM': None,
+    # SYSTEM_BOT_REALM would be a constant always set to 'zulip',
+    # except that it isn't that on zulipchat.com.  We will likely do a
+    # migration and eliminate this parameter in the future.
+    'SYSTEM_BOT_REALM': 'zulip',
 
     # Structurally, we will probably eventually merge
     # analytics into part of the main server, rather
@@ -283,7 +296,6 @@ DEFAULT_SETTINGS.update({
     'EMAIL_DELIVERER_DISABLED': False,
     'REGISTER_LINK_DISABLED': None,
     'LOGIN_LINK_DISABLED': False,
-    'ABOUT_LINK_DISABLED': False,
     'FIND_TEAM_LINK_DISABLED': True,
 
     # What domains to treat like the root domain
@@ -438,6 +450,15 @@ MIDDLEWARE = (
     'django.contrib.auth.middleware.AuthenticationMiddleware',
 )
 
+# Make sure these come after authentication middleware.
+TWO_FACTOR_MIDDLEWARE = (
+    'django_otp.middleware.OTPMiddleware',  # Required by Two Factor auth.
+    'two_factor.middleware.threadlocals.ThreadLocals',  # Required by Twilio
+)
+
+if TWO_FACTOR_AUTHENTICATION_ENABLED:
+    MIDDLEWARE += TWO_FACTOR_MIDDLEWARE
+
 ANONYMOUS_USER_ID = None
 
 AUTH_USER_MODEL = "zerver.UserProfile"
@@ -465,6 +486,13 @@ INSTALLED_APPS = [
 ]
 if USING_PGROONGA:
     INSTALLED_APPS += ['pgroonga']
+if TWO_FACTOR_AUTHENTICATION_ENABLED:
+    INSTALLED_APPS += [
+        'django_otp',
+        'django_otp.plugins.otp_static',
+        'django_otp.plugins.otp_totp',
+        'two_factor',
+    ]
 INSTALLED_APPS += EXTRA_INSTALLED_APPS
 
 ZILENCER_ENABLED = 'zilencer' in INSTALLED_APPS
@@ -475,6 +503,15 @@ ZILENCER_ENABLED = 'zilencer' in INSTALLED_APPS
 TORNADO_SERVER = 'http://127.0.0.1:9993'
 RUNNING_INSIDE_TORNADO = False
 AUTORELOAD = DEBUG
+
+SILENCED_SYSTEM_CHECKS = [
+    # auth.W004 checks that the UserProfile field named by USERNAME_FIELD has
+    # `unique=True`.  For us this is `email`, and it's unique only per-realm.
+    # Per Django docs, this is perfectly fine so long as our authentication
+    # backends support the username not being unique; and they do.
+    # See: https://docs.djangoproject.com/en/1.11/topics/auth/customizing/#django.contrib.auth.models.CustomUser.USERNAME_FIELD
+    "auth.W004",
+]
 
 ########################################################################
 # DATABASE CONFIGURATION
@@ -758,7 +795,7 @@ STATIC_HEADER_FILE = 'zerver/static_header.txt'
 # static files.
 #
 # Useful reading on how this works is in
-# https://zulip.readthedocs.io/en/latest/front-end-build-process.html
+# https://zulip.readthedocs.io/en/latest/subsystems/front-end-build-process.html
 
 PIPELINE = {
     'PIPELINE_ENABLED': PIPELINE_ENABLED,
@@ -783,6 +820,7 @@ PIPELINE = {
                 'styles/portico-signin.css',
                 'styles/pygments.css',
                 'third/thirdparty-fonts.css',
+                'generated/icons/style.css',
                 'styles/fonts.css',
             ),
             'output_filename': 'min/portico.css'
@@ -799,6 +837,7 @@ PIPELINE = {
                 'third/bootstrap-notify/css/bootstrap-notify.css',
                 'third/spectrum/spectrum.css',
                 'third/thirdparty-fonts.css',
+                'generated/icons/style.css',
                 'styles/components.css',
                 'styles/app_components.css',
                 'styles/zulip.css',
@@ -806,6 +845,7 @@ PIPELINE = {
                 'styles/settings.css',
                 'styles/subscriptions.css',
                 'styles/drafts.css',
+                'styles/input_pill.css',
                 'styles/informational-overlays.css',
                 'styles/compose.css',
                 'styles/reactions.css',
@@ -817,6 +857,7 @@ PIPELINE = {
                 'styles/media.css',
                 'styles/typing_notifications.css',
                 'styles/hotspots.css',
+                'styles/dark.css',
                 # We don't want fonts.css on QtWebKit, so its omitted here
             ),
             'output_filename': 'min/app-fontcompat.css'
@@ -826,6 +867,7 @@ PIPELINE = {
                 'third/bootstrap-notify/css/bootstrap-notify.css',
                 'third/spectrum/spectrum.css',
                 'third/thirdparty-fonts.css',
+                'generated/icons/style.css',
                 'node_modules/katex/dist/katex.css',
                 'styles/components.css',
                 'styles/app_components.css',
@@ -834,6 +876,7 @@ PIPELINE = {
                 'styles/settings.css',
                 'styles/subscriptions.css',
                 'styles/drafts.css',
+                'styles/input_pill.css',
                 'styles/informational-overlays.css',
                 'styles/compose.css',
                 'styles/reactions.css',
@@ -846,6 +889,7 @@ PIPELINE = {
                 'styles/media.css',
                 'styles/typing_notifications.css',
                 'styles/hotspots.css',
+                'styles/dark.css',
             ),
             'output_filename': 'min/app.css'
         },
@@ -887,7 +931,7 @@ PIPELINE = {
 }
 
 # Useful reading on how this works is in
-# https://zulip.readthedocs.io/en/latest/front-end-build-process.html
+# https://zulip.readthedocs.io/en/latest/subsystems/front-end-build-process.html
 JS_SPECS = {
     'app': {
         'source_filenames': [
@@ -910,6 +954,7 @@ JS_SPECS = {
             'node_modules/string.prototype.codepointat/codepointat.js',
             'node_modules/winchan/winchan.js',
             'node_modules/handlebars/dist/handlebars.runtime.js',
+            'node_modules/to-markdown/dist/to-markdown.js',
             'third/marked/lib/marked.js',
             'generated/emoji/emoji_codes.js',
             'generated/pygments_data.js',
@@ -924,6 +969,7 @@ JS_SPECS = {
             'js/components.js',
             'js/localstorage.js',
             'js/drafts.js',
+            'js/input_pill.js',
             'js/channel.js',
             'js/setup.js',
             'js/unread_ui.js',
@@ -933,6 +979,7 @@ JS_SPECS = {
             'js/message_viewport.js',
             'js/rows.js',
             'js/people.js',
+            'js/user_groups.js',
             'js/unread.js',
             'js/topic_list.js',
             'js/pm_list.js',
@@ -958,6 +1005,7 @@ JS_SPECS = {
             'js/compose_state.js',
             'js/compose_actions.js',
             'js/compose.js',
+            'js/upload.js',
             'js/stream_color.js',
             'js/stream_data.js',
             'js/topic_data.js',
@@ -974,6 +1022,7 @@ JS_SPECS = {
             'js/lightbox.js',
             'js/ui_report.js',
             'js/ui.js',
+            'js/night_mode.js',
             'js/ui_util.js',
             'js/pointer.js',
             'js/click_handlers.js',
@@ -1152,6 +1201,7 @@ ZULIP_PATHS = [
     ("ANALYTICS_LOCK_DIR", "/home/zulip/deployments/analytics-lock-dir"),
     ("API_KEY_ONLY_WEBHOOK_LOG_PATH", "/var/log/zulip/webhooks_errors.log"),
     ("SOFT_DEACTIVATION_LOG_PATH", "/var/log/zulip/soft_deactivation.log"),
+    ("TRACEMALLOC_DUMP_DIR", "/var/log/zulip/tracemalloc"),
 ]
 
 # The Event log basically logs most significant database changes,
@@ -1463,6 +1513,14 @@ if PRODUCTION:
 # This is a debugging option only
 PROFILE_ALL_REQUESTS = False
 
-CROSS_REALM_BOT_EMAILS = set(('feedback@zulip.com', 'notification-bot@zulip.com', 'welcome-bot@zulip.com'))
+CROSS_REALM_BOT_EMAILS = {
+    'feedback@zulip.com',
+    'notification-bot@zulip.com',
+    'welcome-bot@zulip.com',
+    'new-user-bot@zulip.com',
+    'emailgateway@zulip.com',
+}
 
 CONTRIBUTORS_DATA = os.path.join(STATIC_ROOT, 'generated/github-contributors.json')
+
+THUMBOR_KEY = get_secret('thumbor_key')

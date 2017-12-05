@@ -202,7 +202,6 @@ html {
     stroke: #fff !important;
 }
 
-
 .new-style {
     -webkit-font-smoothing: antialiased;
 }
@@ -491,7 +490,6 @@ html {
     width: 328px;
 }
 
-
 .split-view .org-header .avatar,
 .register-page-container .org-header .avatar {
     display: inline-block;
@@ -574,8 +572,7 @@ html {
     margin-bottom: 10px;
 }
 
-button.login-google-button,
-button.login-github-button {
+button.login-social-button {
     width: 328px;
     padding-left: 35px;
 
@@ -588,21 +585,18 @@ button.login-github-button {
     color: #fff;
 }
 
-button.login-google-button,
-button.login-github-button {
+button.login-social-button {
     background-color: #fff;
     box-shadow: 0px 1px 3px hsla(0, 0%, 0%, 0.3), 0px 0px 5px hsla(0, 0%, 0%, 0.1);
     color: hsl(0, 0%, 34%);
 }
 
-button.login-google-button:hover,
-button.login-github-button:hover {
+button.login-social-button:hover {
     background-color: hsl(0, 0%, 98%);
     box-shadow: 1px 2px 5px hsla(0, 0%, 0%, 0.2);
 }
 
-button.login-google-button:active,
-button.login-github-button:active {
+button.login-social-button:active {
     background-color: hsl(0, 0%, 93%);
     box-shadow: 0px 1px 1px hsla(0, 0%, 0%, 0.3);
 }
@@ -630,6 +624,7 @@ button.login-google-button {
 .forgot-password-container .actions {
     line-height: 0;
 }
+
 .forgot-password-container .actions .back-to-login i {
     position: relative;
     top: 5px;
@@ -690,7 +685,6 @@ button.login-google-button {
     position: static !important;
     margin-left: 2px;
 }
-
 
 #registration [for="realm_in_root_domain"] {
     font-weight: normal !important;

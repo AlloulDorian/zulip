@@ -68,6 +68,16 @@ may contain letters, numbers, colons, dashes, and underscores.
 You'll need to run this from the Zulip development environment (e.g. in
 Vagrant).
 
+The script will also stop if a droplet has already been created for the
+user. If you want to recreate a droplet for a user you can pass the
+`--recreate` flag.
+
+```
+$ python3 create.py <username> --recreate
+```
+This will destroy the old droplet and create a new droplet for
+the user.
+
 In order for the script to work, the GitHub user must have:
 
 - forked the [zulip/zulip][zulip-zulip] repository, and
@@ -77,10 +87,6 @@ In order for the script to work, the GitHub user must have:
 steps.)
 
 The script will stop if it can't find the user's fork or ssh keys.
-
-The script will also stop if a droplet has already been created for the user.
-If you need to re-create a droplet, login to Digital Ocean with your browser
-and delete **both** the **droplet** and its **dns entry**.
 
 Once the droplet is created, you will see something similar to this message:
 
@@ -97,9 +103,9 @@ Your remote Zulip dev server has been created!
   at http://<username>.zulipdev.org:9991.
 
 See [Developing
-remotely](http://zulip.readthedocs.io/en/latest/dev-remote.html) for tips on
+remotely](https://zulip.readthedocs.io/en/latest/development/remote.html) for tips on
 using the remote dev instance and [Git & GitHub
-Guide](http://zulip.readthedocs.io/en/latest/git-guide.html) to learn how to
+Guide](https://zulip.readthedocs.io/en/latest/git/index.html) to learn how to
 use Git with Zulip.
 ```
 
@@ -110,7 +116,7 @@ so they are notified.
 [image-zulip-team]: http://cdn.subfictional.com/dropshare/Screen-Shot-2016-11-28-10-53-24-X86JYrrOzu.png
 [zulip-zulip]: https://github.com/zulip/zulip
 [python-digitalocean]: https://github.com/koalalorenzo/python-digitalocean
-[how-to-request]: https://github.com/zulip/zulip-gci/blob/master/request-remote-dev.md
+[how-to-request]: https://zulip.readthedocs.io/en/latest/development/request-remote.html
 
 ## Updating the base image
 
@@ -142,3 +148,25 @@ Rough steps:
    appropriate `id`, and region with the appropriate region.
 1. Test that everything works.
 1. Open a PR with the updated template_id in zulip/zulip!
+
+## Remotely debugging a droplet
+
+To SSH into a droplet, first make sure you have a SSH key associated with your
+github account, then ask the student to run the following in their
+VM:
+
+```
+$ python3 ~/zulip/tools/droplets/add_mentor.py <your username>
+```
+
+You should now be able to connect to it using:
+
+```
+$ ssh zulipdev@<their username>.zulipdev.org
+```
+
+They can remove your SSH keys by running:
+
+```
+$ python3 ~/zulip/tools/droplets/add_mentor.py <your username> --remove
+```

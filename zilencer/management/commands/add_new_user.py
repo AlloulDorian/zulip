@@ -1,21 +1,20 @@
+from typing import Any
+
 from django.core.management.base import CommandParser
+
 from zerver.lib.actions import do_create_user
 from zerver.lib.management import ZulipBaseCommand
 from zerver.models import Realm, UserProfile
-
-from typing import Any
 
 class Command(ZulipBaseCommand):
     help = """Add a new user for manual testing of the onboarding process.
 If realm is unspecified, will try to use a realm created by add_new_realm,
 and will otherwise fall back to the zulip realm."""
 
-    def add_arguments(self, parser):
-        # type: (CommandParser) -> None
+    def add_arguments(self, parser: CommandParser) -> None:
         self.add_realm_args(parser)
 
-    def handle(self, **options):
-        # type: (**Any) -> None
+    def handle(self, **options: Any) -> None:
         realm = self.get_realm(options)
         if realm is None:
             realm = Realm.objects.filter(string_id__startswith='realm') \

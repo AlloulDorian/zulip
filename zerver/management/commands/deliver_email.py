@@ -10,18 +10,18 @@ on all but one machine to make the command have no effect.)
 """
 
 
+import time
+from typing import Any
+
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils.timezone import now as timezone_now
-
-from zerver.models import ScheduledEmail
-from zerver.lib.context_managers import lockfile
-from zerver.lib.send_email import send_email, EmailNotDeliveredException
-
-import time
-from zerver.lib.logging_util import create_logger
 from ujson import loads
-from typing import Any
+
+from zerver.lib.context_managers import lockfile
+from zerver.lib.logging_util import create_logger
+from zerver.lib.send_email import EmailNotDeliveredException, send_email
+from zerver.models import ScheduledEmail
 
 ## Setup ##
 logger = create_logger(__name__, settings.EMAIL_DELIVERER_LOG_PATH, 'DEBUG')
@@ -43,7 +43,8 @@ Usage: ./manage.py deliver_email
 
         with lockfile("/tmp/zulip_email_deliver.lockfile"):
             while True:
-                email_jobs_to_deliver = ScheduledEmail.objects.filter(scheduled_timestamp__lte=timezone_now())
+                email_jobs_to_deliver = ScheduledEmail.objects.filter(
+                    scheduled_timestamp__lte=timezone_now())
                 if email_jobs_to_deliver:
                     for job in email_jobs_to_deliver:
                         try:
@@ -53,5 +54,6 @@ Usage: ./manage.py deliver_email
                             logger.warning("%r not delivered" % (job,))
                     time.sleep(10)
                 else:
-                    # Less load on the db during times of activity, and more responsiveness when the load is low
+                    # Less load on the db during times of activity,
+                    # and more responsiveness when the load is low
                     time.sleep(2)

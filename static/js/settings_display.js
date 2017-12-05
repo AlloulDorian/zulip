@@ -2,11 +2,42 @@ var settings_display = (function () {
 
 var exports = {};
 
+exports.set_night_mode = function (bool) {
+    if (!page_params.development_environment) {
+        return;
+    }
+
+    var night_mode = bool;
+    var data = { night_mode: JSON.stringify(night_mode) };
+    var context = {
+        enable_text: data.night_mode === "true" ?
+            i18n.t("enabled") :
+            i18n.t("disabled"),
+    };
+
+    channel.patch({
+        url: '/json/settings/display',
+        data: data,
+        success: function () {
+            page_params.night_mode = night_mode;
+            if (overlays.settings_open()) {
+                ui_report.success(i18n.t("Night mode __enable_text__!", context),
+                                  $('#display-settings-status').expectOne());
+            }
+        },
+        error: function (xhr) {
+            if (overlays.settings_open()) {
+                ui_report.error(i18n.t("Error updating night mode setting."), xhr, $('#display-settings-status').expectOne());
+            }
+        },
+    });
+};
+
 exports.set_up = function () {
     $("#display-settings-status").hide();
 
     $("#user_timezone").val(page_params.timezone);
-    $("#emojiset_select").val(page_params.emojiset);
+    $(".emojiset_choice[value=" + page_params.emojiset + "]").prop("checked", true);
 
     $("#default_language_modal [data-dismiss]").click(function () {
         overlays.close_modal('default_language_modal');
@@ -69,6 +100,10 @@ exports.set_up = function () {
                 ui_report.error(i18n.t("Error updating high contrast setting"), xhr, $('#display-settings-status').expectOne());
             },
         });
+    });
+
+    $("#night_mode").change(function () {
+        exports.set_night_mode(this.checked);
     });
 
     $("#left_side_userlist").change(function () {
@@ -160,7 +195,7 @@ exports.set_up = function () {
         });
     });
 
-    $("#emojiset_select").change(function () {
+    $(".emojiset_choice").click(function () {
         var emojiset = $(this).val();
         var data = {};
         data.emojiset = JSON.stringify(emojiset);

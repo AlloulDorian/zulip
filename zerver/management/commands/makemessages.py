@@ -1,6 +1,6 @@
 """
 The contents of this file are taken from
-[Django-admin](https://github.com/niwinz/django-jinja/blob/master/django_jinja/management/commands/makemessages.py)
+https://github.com/niwinz/django-jinja/blob/master/django_jinja/management/commands/makemessages.py
 
 Jinja2's i18n functionality is not exactly the same as Django's.
 In particular, the tags names and their syntax are different:
@@ -25,26 +25,26 @@ unfortunately isn't extensible, so we can:
 We are currently doing that last thing. It turns out there we are lucky
 for once: It's simply a matter of extending two regular expressions.
 Credit for the approach goes to:
-http://stackoverflow.com/questions/2090717/getting-translation-strings-for-jinja2-templates-integrated-with-django-1-x
+http://stackoverflow.com/questions/2090717
 
 """
 
-from typing import Any, Dict, Iterable, Mapping, Text, List
-
-from argparse import ArgumentParser
-import os
-import re
 import glob
 import json
+import os
+import re
+from argparse import ArgumentParser
+from typing import Any, Dict, Iterable, List, Mapping, Text
 
-from django.core.management.commands import makemessages
-from django.template.base import BLOCK_TAG_START, BLOCK_TAG_END
 from django.conf import settings
+from django.core.management.commands import makemessages
+from django.template.base import BLOCK_TAG_END, BLOCK_TAG_START
 from django.utils.translation import template
 
 from zerver.lib.str_utils import force_text
 
-strip_whitespace_right = re.compile("(%s-?\\s*(trans|pluralize).*?-%s)\\s+" % (BLOCK_TAG_START, BLOCK_TAG_END), re.U)
+strip_whitespace_right = re.compile("(%s-?\\s*(trans|pluralize).*?-%s)\\s+" % (
+                                    BLOCK_TAG_START, BLOCK_TAG_END), re.U)
 strip_whitespace_left = re.compile("\\s+(%s-\\s*(endtrans|pluralize).*?-?%s)" % (
                                    BLOCK_TAG_START, BLOCK_TAG_END), re.U)
 

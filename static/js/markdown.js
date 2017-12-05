@@ -1,5 +1,5 @@
 // This contains zulip's frontend markdown implementation; see
-// docs/markdown.md for docs on our Markdown syntax.  The other
+// docs/subsystems/markdown.md for docs on our Markdown syntax.  The other
 // main piece in rendering markdown client-side is
 // static/third/marked/lib/marked.js, which we have significantly
 // modified from the original implementation.
@@ -68,6 +68,18 @@ exports.apply_markdown = function (message) {
                 push_uniquely(message.flags, 'mentioned');
                 return '<span class="user-mention" data-user-id="*">' +
                        '@' + name +
+                       '</span>';
+            }
+            return undefined;
+        },
+        groupMentionHandler: function (name) {
+            var group = user_groups.get_user_group_from_name(name);
+            if (group !== undefined) {
+                if (user_groups.is_member_of(group.id, people.my_current_user_id())) {
+                    push_uniquely(message.flags, 'mentioned');
+                }
+                return '<span class="user-group-mention" data-user-group-id="' + group.id + '">' +
+                       '@' + group.name +
                        '</span>';
             }
             return undefined;

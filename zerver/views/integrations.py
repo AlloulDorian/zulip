@@ -10,14 +10,14 @@ import os
 import ujson
 
 from zerver.lib import bugdown
-from zerver.lib.integrations import CATEGORIES, INTEGRATIONS, HUBOT_LOZENGES
+from zerver.lib.integrations import CATEGORIES, INTEGRATIONS, HubotIntegration, \
+    WebhookIntegration
 from zerver.lib.request import has_request_variables, REQ
 from zerver.lib.subdomains import get_subdomain
 from zerver.models import Realm
 from zerver.templatetags.app_filters import render_markdown_path
 
-def add_api_uri_context(context, request):
-    # type: (Dict[str, Any], HttpRequest) -> None
+def add_api_uri_context(context: Dict[str, Any], request: HttpRequest) -> None:
     subdomain = get_subdomain(request)
     if (subdomain != Realm.SUBDOMAIN_FOR_ROOT_DOMAIN
             or not settings.ROOT_DOMAIN_LANDING_PAGE):
@@ -36,8 +36,7 @@ def add_api_uri_context(context, request):
     context["html_settings_links"] = html_settings_links
 
 class ApiURLView(TemplateView):
-    def get_context_data(self, **kwargs):
-        # type: (**Any) -> Dict[str, str]
+    def get_context_data(self, **kwargs: Any) -> Dict[str, str]:
         context = super().get_context_data(**kwargs)
         add_api_uri_context(context, self.request)
         return context
@@ -49,16 +48,14 @@ class APIView(ApiURLView):
 class MarkdownDirectoryView(ApiURLView):
     path_template = ""
 
-    def get_path(self, article):
-        # type: (str) -> str
+    def get_path(self, article: str) -> str:
         if article == "":
             article = "index"
         elif "/" in article:
             article = "missing"
         return self.path_template % (article,)
 
-    def get_context_data(self, **kwargs):
-        # type: (**Any) -> Dict[str, Any]
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         article = kwargs["article"]
         context = super().get_context_data()  # type: Dict[str, Any]
         path = self.get_path(article)
@@ -80,8 +77,7 @@ class MarkdownDirectoryView(ApiURLView):
         context["api_uri_context"] = api_uri_context
         return context
 
-    def get(self, request, article=""):
-        # type: (HttpRequest, str) -> HttpResponse
+    def get(self, request: HttpRequest, article: str="") -> HttpResponse:
         path = self.get_path(article)
         result = super().get(self, article=article)
         try:
@@ -94,14 +90,11 @@ class MarkdownDirectoryView(ApiURLView):
         return result
 
 
-def add_integrations_context(context):
-    # type: (Dict[str, Any]) -> None
+def add_integrations_context(context: Dict[str, Any]) -> None:
     alphabetical_sorted_categories = OrderedDict(sorted(CATEGORIES.items()))
     alphabetical_sorted_integration = OrderedDict(sorted(INTEGRATIONS.items()))
-    alphabetical_sorted_hubot_lozenges = OrderedDict(sorted(HUBOT_LOZENGES.items()))
     context['categories_dict'] = alphabetical_sorted_categories
     context['integrations_dict'] = alphabetical_sorted_integration
-    context['hubot_lozenges_dict'] = alphabetical_sorted_hubot_lozenges
 
     if "html_settings_links" in context and context["html_settings_links"]:
         settings_html = '<a href="../../#settings">Zulip settings page</a>'
@@ -113,39 +106,54 @@ def add_integrations_context(context):
     context['settings_html'] = settings_html
     context['subscriptions_html'] = subscriptions_html
 
-    for name in alphabetical_sorted_integration:
-        alphabetical_sorted_integration[name].add_doc_context(context)
 
-    for name in alphabetical_sorted_hubot_lozenges:
-        alphabetical_sorted_hubot_lozenges[name].add_doc_context(context)
+def add_context_for_single_integration(context: Dict[str, Any], name: str, request: HttpRequest) -> None:
+    add_api_uri_context(context, request)
+
+    if "html_settings_links" in context and context["html_settings_links"]:
+        settings_html = '<a href="../../#settings">Zulip settings page</a>'
+        subscriptions_html = '<a target="_blank" href="../../#streams">streams page</a>'
+    else:
+        settings_html = 'Zulip settings page'
+        subscriptions_html = 'streams page'
+
+    context['settings_html'] = settings_html
+    context['subscriptions_html'] = subscriptions_html
 
 
 class IntegrationView(ApiURLView):
     template_name = 'zerver/integrations/index.html'
 
-    def get_context_data(self, **kwargs):
-        # type: (**Any) -> Dict[str, Any]
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)  # type: Dict[str, Any]
         add_integrations_context(context)
         return context
 
 
 @has_request_variables
-def integration_doc(request, integration_name=REQ(default=None)):
-    # type: (HttpRequest, str) -> HttpResponse
+def integration_doc(request: HttpRequest, integration_name: str=REQ(default=None)) -> HttpResponse:
     try:
         integration = INTEGRATIONS[integration_name]
     except KeyError:
         return HttpResponseNotFound()
 
-    context = integration.doc_context or {}
-    add_integrations_context(context)
+    context = {}  # type: Dict[str, Any]
+    add_context_for_single_integration(context, integration_name, request)
+
+    context['integration_name'] = integration.name
+    context['integration_display_name'] = integration.display_name
+    if hasattr(integration, 'stream_name'):
+        context['recommended_stream_name'] = integration.stream_name
+    if isinstance(integration, WebhookIntegration):
+        context['integration_url'] = integration.url[3:]
+    if isinstance(integration, HubotIntegration):
+        context['hubot_docs_url'] = integration.hubot_docs_url
+
     doc_html_str = render_markdown_path(integration.doc, context)
 
     return HttpResponse(doc_html_str)
 
-def api_endpoint_docs(request):
-    # type: (HttpRequest) -> HttpResponse
+def api_endpoint_docs(request: HttpRequest) -> HttpResponse:
     context = {}  # type: Dict[str, Any]
     add_api_uri_context(context, request)
 

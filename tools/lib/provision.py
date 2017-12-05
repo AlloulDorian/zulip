@@ -80,7 +80,7 @@ try:
 except OSError as err:
     print("Error: Unable to create symlinks. Make sure you have permission to create symbolic links.")
     print("See this page for more information:")
-    print("  http://zulip.readthedocs.io/en/latest/dev-env-first-time-contributors.html#os-symlink-error")
+    print("  https://zulip.readthedocs.io/en/latest/development/setup-vagrant.html#os-symlink-error")
     sys.exit(1)
 
 if platform.architecture()[0] == '64bit':
@@ -88,7 +88,8 @@ if platform.architecture()[0] == '64bit':
 elif platform.architecture()[0] == '32bit':
     arch = "i386"
 else:
-    logging.critical("Only x86 is supported; ping zulip-devel@googlegroups.com if you want another architecture.")
+    logging.critical("Only x86 is supported;"
+                     "ping zulip-devel@googlegroups.com if you want another architecture.")
     sys.exit(1)
 
 # Ideally we wouldn't need to install a dependency here, before we
@@ -248,8 +249,7 @@ def main(options):
         # issue with the symlinks being improperly owned by root.
         if os.path.islink("node_modules"):
             run(["sudo", "rm", "-f", "node_modules"])
-        if not os.path.isdir(NODE_MODULES_CACHE_PATH):
-            run(["sudo", "mkdir", NODE_MODULES_CACHE_PATH])
+        run(["sudo", "mkdir", "-p", NODE_MODULES_CACHE_PATH])
         run(["sudo", "chown", "%s:%s" % (user_id, user_id), NODE_MODULES_CACHE_PATH])
         setup_node_modules(prefer_offline=True)
     except subprocess.CalledProcessError:
@@ -290,6 +290,7 @@ def main(options):
     # copy over static files from the zulip_bots package
     run(["tools/setup/generate_zulip_bots_static_files"])
 
+    run(["tools/generate-custom-icon-webfont"])
     run(["tools/setup/build_pygments_data"])
     run(["scripts/setup/generate_secrets.py", "--development"])
     run(["tools/update-authors-json", "--use-fixture"])
@@ -370,6 +371,8 @@ def main(options):
             run(["./manage.py", "compilemessages"])
         else:
             print("No need to run `manage.py compilemessages`.")
+
+    run(["scripts/lib/clean-unused-caches"])
 
     version_file = os.path.join(UUID_VAR_PATH, 'provision_version')
     print('writing to %s\n' % (version_file,))

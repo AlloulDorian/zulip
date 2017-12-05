@@ -30,8 +30,6 @@
 }
 
 .subscriptions {
-    margin-top: 55px;
-    padding-left: 15px;
     -webkit-font-smoothing: antialiased;
 }
 
@@ -418,7 +416,6 @@ form#add_new_subscription {
 .subscriptions-container {
     position: relative;
     height: 95%;
-    background-color: #fff;
     border-radius: 4px;
     padding: 0px;
     width: 97%;
@@ -545,9 +542,7 @@ form#add_new_subscription {
     font-size: 1em;
     line-height: 1;
     margin: 9px 0px;
-    font-weight: 400;
     font-weight: 600;
-    color: hsl(0, 0%, 27%);
 }
 
 .subscriptions-container .right #preview_iframe {
@@ -676,9 +671,9 @@ form#add_new_subscription {
     width: 35px;
     height: 35px;
     margin-right: 8px;
-    background-color: purple;
+    background-color: hsl(300, 100%, 25%);
     border-radius: 4px;
-    color: #fff;
+    color: hsl(0, 0%, 100%);
 }
 
 .stream-row .icon .symbol {
@@ -747,7 +742,7 @@ form#add_new_subscription {
 #subscription_overlay #stream-creation .modal-footer {
     position: absolute;
     bottom: 0;
-    width: calc(100% - 30px);
+    width: calc(100% - 27px);
 }
 
 #stream-creation .stream-creation-body {
@@ -893,7 +888,7 @@ form#add_new_subscription {
 #subscription_overlay .subscription-type {
     margin-bottom: 10px;
     font-size: 0.9em;
-    color: hsl(0, 0%, 53%);
+    opacity: 0.5;
 }
 
 #subscription_overlay .subscription-type .subscription-type-text {
@@ -902,7 +897,6 @@ form#add_new_subscription {
 
 #subscription_overlay .subscription-type b {
     font-weight: 600;
-    color: hsl(0, 0%, 40%);
 }
 
 #subscription_overlay .stream-header .large-icon.hash::after {

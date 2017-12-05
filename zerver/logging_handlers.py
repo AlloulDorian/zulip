@@ -1,12 +1,11 @@
-# System documented in https://zulip.readthedocs.io/en/latest/logging.html
-
-from django.conf import settings
-from typing import Any, Dict, Optional
+# System documented in https://zulip.readthedocs.io/en/latest/subsystems/logging.html
 
 import logging
-import traceback
 import platform
+import traceback
+from typing import Any, Dict, Optional
 
+from django.conf import settings
 from django.core import mail
 from django.http import HttpRequest
 from django.utils.log import AdminEmailHandler
@@ -14,8 +13,7 @@ from django.views.debug import ExceptionReporter, get_exception_reporter_filter
 
 from zerver.lib.queue import queue_json_publish
 
-def add_request_metadata(report, request):
-    # type: (Dict[str, Any], HttpRequest) -> None
+def add_request_metadata(report: Dict[str, Any], request: HttpRequest) -> None:
     report['path'] = request.path
     report['method'] = request.method
     report['remote_addr'] = request.META.get('REMOTE_ADDR', None),
@@ -61,12 +59,10 @@ class AdminZulipHandler(logging.Handler):
 
     # adapted in part from django/utils/log.py
 
-    def __init__(self):
-        # type: () -> None
+    def __init__(self) -> None:
         logging.Handler.__init__(self)
 
-    def emit(self, record):
-        # type: (logging.LogRecord) -> None
+    def emit(self, record: logging.LogRecord) -> None:
         try:
             if record.exc_info:
                 stack_trace = ''.join(traceback.format_exception(*record.exc_info))  # type: Optional[str]
@@ -107,7 +103,7 @@ class AdminZulipHandler(logging.Handler):
                 queue_json_publish('error_reports', dict(
                     type = "server",
                     report = report,
-                ), lambda x: None, call_consume_in_tests=True)
+                ))
         except Exception:
             # If this breaks, complain loudly but don't pass the traceback up the stream
             # However, we *don't* want to use logging.exception since that could trigger a loop.

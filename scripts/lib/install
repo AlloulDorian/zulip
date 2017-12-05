@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -e
 
-# Ensure that we're using a US locale, since some pip dependencies
-# can't install in random locales.
-export LC_ALL="en_US.UTF-8"
-export LC_CTYPE="en_US.UTF-8"
-
 usage() {
-    echo "Usage: install [--hostname=zulip.example.com] [--email=admin@example.com] [--help]"
+    cat <<EOF
+Usage:
+  install [--certbot] [--hostname=zulip.example.com] [--email=admin@example.com]
+  install --help
+
+If --certbot is used, --hostname and --email are required.
+EOF
     exit 0
 };
 
@@ -45,8 +46,16 @@ if [ -n "$show_help" ]; then
     usage
 fi
 
+if [ -n "$USE_CERTBOT" ] \
+       && { [ -z "$EXTERNAL_HOST" ] || [ -z "$ZULIP_ADMINISTRATOR" ]; }; then
+    usage
+fi
+
 # Do set -x after option parsing is complete
 set -x
+
+# Force a known locale.  Some packages on PyPI fail to install in some locales.
+export LC_ALL="en_US.UTF-8"
 
 # Specify options for apt.
 APT_OPTIONS="${APT_OPTIONS:-}"
@@ -83,7 +92,9 @@ ZULIP_PATH="$(realpath $(dirname $0)/../..)"
 "$ZULIP_PATH"/scripts/lib/check-upstart
 
 if [ -n "$USE_CERTBOT" ]; then
-    "$ZULIP_PATH"/scripts/setup/setup-certbot --hostname "$EXTERNAL_HOST" --email "$ZULIP_ADMINISTRATOR"
+    "$ZULIP_PATH"/scripts/setup/setup-certbot \
+        --no-zulip-conf --method=standalone \
+        --hostname "$EXTERNAL_HOST" --email "$ZULIP_ADMINISTRATOR"
 fi
 
 # Check for missing SSL certificates early as well
@@ -94,7 +105,7 @@ if [ "$PUPPET_CLASSES" = "zulip::voyager" ] && { ! [ -e "/etc/ssl/private/zulip.
    for f in "/etc/ssl/private/zulip.key" "/etc/ssl/certs/zulip.combined-chain.crt"; do
        [ -e "$f" ] || echo " - $f is missing!"
    done
-   echo "See http://zulip.readthedocs.io/en/latest/ssl-certificates.html for help."
+   echo "See https://zulip.readthedocs.io/en/latest/production/ssl-certificates.html for help."
    echo
    echo "Once fixed, just rerun scripts/setup/install; it'll pick up from here!"
    echo
@@ -134,6 +145,10 @@ mkdir -p /etc/zulip
     if [ -n "$TRAVIS" ] || ! dpkg-query --showformat '${Status}\n' -W rabbitmq-server 2>/dev/null | grep -vq ' not-installed$'; then
         echo -e "\n[rabbitmq]\nnodename = zulip@localhost"
     fi
+
+    if [ -n "$USE_CERTBOT" ]; then
+        echo -e "\n[certbot]\nauto_renew = yes"
+    fi
 ) > /etc/zulip/zulip.conf
 "$ZULIP_PATH"/scripts/zulip-puppet-apply -f
 
@@ -167,7 +182,7 @@ if [ "$has_nginx" = 0 ]; then
         echo "Verifying the Zulip nginx configuration failed!"
         echo
         echo "This is almost always a problem with your SSL certificates."
-        echo "See http://zulip.readthedocs.io/en/latest/ssl-certificates.html for help"
+        echo "See https://zulip.readthedocs.io/en/latest/production/ssl-certificates.html for help"
         echo
         echo "Once fixed, just rerun scripts/setup/install; it'll pick up from here!"
         echo

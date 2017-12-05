@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 
-from django.core.management.base import BaseCommand
-from zerver.lib.actions import create_stream_if_needed, \
-    internal_prep_stream_message, do_create_user, do_send_messages, \
-    do_add_reaction_legacy, bulk_add_subscriptions, do_change_avatar_fields
-from zerver.lib.upload import upload_avatar_image
-from zerver.models import get_realm, UserProfile, Message
-
 from typing import Any, Dict, List
+
+from django.core.management.base import BaseCommand
+
+from zerver.lib.actions import bulk_add_subscriptions, \
+    create_stream_if_needed, do_add_reaction_legacy, do_change_avatar_fields, \
+    do_create_user, do_send_messages, internal_prep_stream_message
+from zerver.lib.upload import upload_avatar_image
+from zerver.models import Message, UserProfile, get_realm
 
 class Command(BaseCommand):
     help = """Add a mock conversation to the development environment.
@@ -29,13 +30,11 @@ From image editing program:
 * Remove mute (and edit) icons from recipient bar
 """
 
-    def set_avatar(self, user, filename):
-        # type: (UserProfile, str) -> None
+    def set_avatar(self, user: UserProfile, filename: str) -> None:
         upload_avatar_image(open(filename, 'rb'), user, user)
         do_change_avatar_fields(user, UserProfile.AVATAR_FROM_USER)
 
-    def add_message_formatting_conversation(self):
-        # type: () -> None
+    def add_message_formatting_conversation(self) -> None:
         realm = get_realm('zulip')
         stream, _ = create_stream_if_needed(realm, 'zulip features')
 
@@ -105,6 +104,5 @@ From image editing program:
         # thumbs_up shows up second
         do_add_reaction_legacy(starr, preview_message, 'thumbs_up')
 
-    def handle(self, *args, **options):
-        # type: (*Any, **str) -> None
+    def handle(self, *args: Any, **options: str) -> None:
         self.add_message_formatting_conversation()

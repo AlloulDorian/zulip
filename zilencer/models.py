@@ -1,11 +1,11 @@
-from django.db import models
+import datetime
 from typing import Text
 
-import zerver.models
-import datetime
+from django.db import models
 
-def get_remote_server_by_uuid(uuid):
-    # type: (Text) -> RemoteZulipServer
+import zerver.models
+
+def get_remote_server_by_uuid(uuid: Text) -> 'RemoteZulipServer':
     return RemoteZulipServer.objects.get(uuid=uuid)
 
 class RemoteZulipServer(models.Model):

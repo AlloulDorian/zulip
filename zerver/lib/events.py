@@ -1,4 +1,4 @@
-# See http://zulip.readthedocs.io/en/latest/events-system.html for
+# See https://zulip.readthedocs.io/en/latest/subsystems/events-system.html for
 # high-level documentation on how this system works.
 
 import copy
@@ -32,24 +32,25 @@ from zerver.lib.actions import (
     validate_user_access_to_subscribers_helper,
     do_get_streams, get_default_streams_for_realm,
     gather_subscriptions_helper, get_cross_realm_dicts,
-    get_status_dict, streams_to_dicts_sorted
+    get_status_dict, streams_to_dicts_sorted,
+    default_stream_groups_to_dicts_sorted
 )
 from zerver.lib.upload import get_total_uploads_size_for_user
+from zerver.lib.user_groups import user_groups_in_realm_serialized
 from zerver.tornado.event_queue import request_event_queue, get_user_events
 from zerver.models import Client, Message, Realm, UserPresence, UserProfile, \
     get_user_profile_by_id, \
     get_realm_user_dicts, realm_filters_for_realm, get_user,\
-    get_owned_bot_dicts, custom_profile_fields_for_realm, get_realm_domains
+    get_owned_bot_dicts, custom_profile_fields_for_realm, get_realm_domains, \
+    get_default_stream_groups
 from zproject.backends import email_auth_enabled, password_auth_enabled
 from version import ZULIP_VERSION
 
 
-def get_raw_user_data(realm_id, client_gravatar):
-    # type: (int, bool) -> Dict[int, Dict[str, Text]]
+def get_raw_user_data(realm_id: int, client_gravatar: bool) -> Dict[int, Dict[str, Text]]:
     user_dicts = get_realm_user_dicts(realm_id)
 
-    def user_data(row):
-        # type: (Dict[str, Any]) -> Dict[str, Any]
+    def user_data(row: Dict[str, Any]) -> Dict[str, Any]:
         avatar_url = get_avatar_field(
             user_id=row['id'],
             realm_id= realm_id,
@@ -78,8 +79,7 @@ def get_raw_user_data(realm_id, client_gravatar):
         for row in user_dicts
     }
 
-def always_want(msg_type):
-    # type: (str) -> bool
+def always_want(msg_type: str) -> bool:
     '''
     This function is used as a helper in
     fetch_initial_state_data, when the user passes
@@ -149,24 +149,31 @@ def fetch_initial_state_data(user_profile, event_types, queue_id, client_gravata
         # Most state is handled via the property_types framework;
         # these manual entries are for those realm settings that don't
         # fit into that framework.
-        state['realm_authentication_methods'] = user_profile.realm.authentication_methods_dict()
-        state['realm_allow_message_editing'] = user_profile.realm.allow_message_editing
-        state['realm_message_content_edit_limit_seconds'] = user_profile.realm.message_content_edit_limit_seconds
-        state['realm_icon_url'] = realm_icon_url(user_profile.realm)
-        state['realm_icon_source'] = user_profile.realm.icon_source
+        realm = user_profile.realm
+        state['realm_authentication_methods'] = realm.authentication_methods_dict()
+        state['realm_allow_message_editing'] = realm.allow_message_editing
+        state['realm_message_content_edit_limit_seconds'] = realm.message_content_edit_limit_seconds
+        state['realm_icon_url'] = realm_icon_url(realm)
+        state['realm_icon_source'] = realm.icon_source
         state['max_icon_file_size'] = settings.MAX_ICON_FILE_SIZE
-        state['realm_bot_domain'] = user_profile.realm.get_bot_domain()
-        state['realm_uri'] = user_profile.realm.uri
-        state['realm_presence_disabled'] = user_profile.realm.presence_disabled
-        state['realm_show_digest_email'] = user_profile.realm.show_digest_email
-        state['realm_is_zephyr_mirror_realm'] = user_profile.realm.is_zephyr_mirror_realm
-        state['realm_email_auth_enabled'] = email_auth_enabled(user_profile.realm)
-        state['realm_password_auth_enabled'] = password_auth_enabled(user_profile.realm)
-        if user_profile.realm.notifications_stream and not user_profile.realm.notifications_stream.deactivated:
-            notifications_stream = user_profile.realm.notifications_stream
+        state['realm_bot_domain'] = realm.get_bot_domain()
+        state['realm_uri'] = realm.uri
+        state['realm_presence_disabled'] = realm.presence_disabled
+        state['realm_show_digest_email'] = realm.show_digest_email
+        state['realm_is_zephyr_mirror_realm'] = realm.is_zephyr_mirror_realm
+        state['realm_email_auth_enabled'] = email_auth_enabled(realm)
+        state['realm_password_auth_enabled'] = password_auth_enabled(realm)
+        if realm.notifications_stream and not realm.notifications_stream.deactivated:
+            notifications_stream = realm.notifications_stream
             state['realm_notifications_stream_id'] = notifications_stream.id
         else:
             state['realm_notifications_stream_id'] = -1
+
+        if user_profile.realm.get_signup_notifications_stream():
+            signup_notifications_stream = user_profile.realm.get_signup_notifications_stream()
+            state['realm_signup_notifications_stream_id'] = signup_notifications_stream.id
+        else:
+            state['realm_signup_notifications_stream_id'] = -1
 
     if want('realm_domains'):
         state['realm_domains'] = get_realm_domains(user_profile.realm)
@@ -176,6 +183,9 @@ def fetch_initial_state_data(user_profile, event_types, queue_id, client_gravata
 
     if want('realm_filters'):
         state['realm_filters'] = realm_filters_for_realm(user_profile.realm_id)
+
+    if want('realm_user_groups'):
+        state['realm_user_groups'] = user_groups_in_realm_serialized(user_profile.realm)
 
     if want('realm_user'):
         state['raw_users'] = get_raw_user_data(
@@ -226,7 +236,11 @@ def fetch_initial_state_data(user_profile, event_types, queue_id, client_gravata
     if want('stream'):
         state['streams'] = do_get_streams(user_profile)
     if want('default_streams'):
-        state['realm_default_streams'] = streams_to_dicts_sorted(get_default_streams_for_realm(user_profile.realm_id))
+        state['realm_default_streams'] = streams_to_dicts_sorted(
+            get_default_streams_for_realm(user_profile.realm_id))
+    if want('default_stream_groups'):
+        state['realm_default_stream_groups'] = default_stream_groups_to_dicts_sorted(
+            get_default_stream_groups(user_profile.realm))
 
     if want('update_display_settings'):
         for prop in UserProfile.property_types:
@@ -245,8 +259,8 @@ def fetch_initial_state_data(user_profile, event_types, queue_id, client_gravata
     return state
 
 
-def remove_message_id_from_unread_mgs(state, message_id):
-    # type: (Dict[str, Dict[str, Any]], int) -> None
+def remove_message_id_from_unread_mgs(state: Dict[str, Dict[str, Any]],
+                                      message_id: int) -> None:
     raw_unread = state['raw_unread_msgs']
 
     for key in ['pm_dict', 'stream_dict', 'huddle_dict']:
@@ -271,8 +285,11 @@ def apply_events(state, events, user_profile, client_gravatar, include_subscribe
             continue
         apply_event(state, event, user_profile, client_gravatar, include_subscribers)
 
-def apply_event(state, event, user_profile, client_gravatar, include_subscribers):
-    # type: (Dict[str, Any], Dict[str, Any], UserProfile, bool, bool) -> None
+def apply_event(state: Dict[str, Any],
+                event: Dict[str, Any],
+                user_profile: UserProfile,
+                client_gravatar: bool,
+                include_subscribers: bool) -> None:
     if event['type'] == "message":
         state['max_message_id'] = max(state['max_message_id'], event['message']['id'])
         if 'raw_unread_msgs' in state:
@@ -392,6 +409,8 @@ def apply_event(state, event, user_profile, client_gravatar, include_subscribers
             state['streams'] = [s for s in state['streams'] if s["stream_id"] not in stream_ids]
     elif event['type'] == 'default_streams':
         state['realm_default_streams'] = event['default_streams']
+    elif event['type'] == 'default_stream_groups':
+        state['realm_default_stream_groups'] = event['default_stream_groups']
     elif event['type'] == 'realm':
         if event['op'] == "update":
             field = 'realm_' + event['property']
@@ -421,8 +440,7 @@ def apply_event(state, event, user_profile, client_gravatar, include_subscribers
                     event['subscriptions'][i] = copy.deepcopy(event['subscriptions'][i])
                     del event['subscriptions'][i]['subscribers']
 
-        def name(sub):
-            # type: (Dict[str, Any]) -> Text
+        def name(sub: Dict[str, Any]) -> Text:
             return sub['name'].lower()
 
         if event['op'] == "add":
@@ -539,6 +557,28 @@ def apply_event(state, event, user_profile, client_gravatar, include_subscribers
     elif event['type'] == "update_global_notifications":
         assert event['notification_name'] in UserProfile.notification_setting_types
         state[event['notification_name']] = event['setting']
+    elif event['type'] == "user_group":
+        if event['op'] == 'add':
+            state['realm_user_groups'].append(event['group'])
+            state['realm_user_groups'].sort(key=lambda group: group['id'])
+        elif event['op'] == 'update':
+            for user_group in state['realm_user_groups']:
+                if user_group['id'] == event['group_id']:
+                    user_group.update(event['data'])
+        elif event['op'] == 'add_members':
+            for user_group in state['realm_user_groups']:
+                if user_group['id'] == event['group_id']:
+                    user_group['members'].extend(event['user_ids'])
+                    user_group['members'].sort()
+        elif event['op'] == 'remove_members':
+            for user_group in state['realm_user_groups']:
+                if user_group['id'] == event['group_id']:
+                    members = set(user_group['members'])
+                    user_group['members'] = list(members - set(event['user_ids']))
+                    user_group['members'].sort()
+        elif event['op'] == 'remove':
+            state['realm_user_groups'] = [ug for ug in state['realm_user_groups']
+                                          if ug['id'] != event['group_id']]
     else:
         raise AssertionError("Unexpected event type %s" % (event['type'],))
 

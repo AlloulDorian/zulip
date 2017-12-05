@@ -13,8 +13,8 @@ from zerver.lib.integrations import WEBHOOK_INTEGRATIONS
 from zerver.webhooks import github_dispatcher
 
 
-from django.contrib.auth.views import (login, password_reset,
-                                       password_reset_done, password_reset_confirm, password_reset_complete)
+from django.contrib.auth.views import (login, password_reset_done,
+                                       password_reset_confirm, password_reset_complete)
 
 import zerver.tornado.views
 import zerver.views
@@ -27,12 +27,16 @@ import zerver.views.zephyr
 import zerver.views.users
 import zerver.views.unsubscribe
 import zerver.views.integrations
+import zerver.views.user_groups
 import zerver.views.user_settings
 import zerver.views.muting
 import zerver.views.streams
-import confirmation.views
 
 from zerver.lib.rest import rest_dispatch
+
+if settings.TWO_FACTOR_AUTHENTICATION_ENABLED:
+    from two_factor.urls import urlpatterns as tf_urls
+    from two_factor.gateways.twilio.urls import urlpatterns as tf_twilio_urls
 
 # NB: There are several other pieces of code which route requests by URL:
 #
@@ -170,13 +174,19 @@ v1_api_and_json_patterns = [
     url(r'users/me/subscriptions/(?P<stream_id>\d+)$', rest_dispatch,
         {'PATCH': 'zerver.views.streams.update_subscriptions_property'}),
 
+    # New endpoint for handling reactions.
+    url(r'^messages/(?P<message_id>[0-9]+)/reactions$',
+        rest_dispatch,
+        {'POST': 'zerver.views.reactions.add_reaction',
+         'DELETE': 'zerver.views.reactions.remove_reaction'}),
+
     # reactions -> zerver.view.reactions
     # PUT adds a reaction to a message
     # DELETE removes a reaction from a message
     url(r'^messages/(?P<message_id>[0-9]+)/emoji_reactions/(?P<emoji_name>.*)$',
         rest_dispatch,
-        {'PUT': 'zerver.views.reactions.add_reaction_backend',
-         'DELETE': 'zerver.views.reactions.remove_reaction_backend'}),
+        {'PUT': 'zerver.views.reactions.add_reaction_legacy',
+         'DELETE': 'zerver.views.reactions.remove_reaction_legacy'}),
 
     # attachments -> zerver.views.attachments
     url(r'^attachments$', rest_dispatch,
@@ -192,6 +202,12 @@ v1_api_and_json_patterns = [
     # user_uploads -> zerver.views.upload
     url(r'^user_uploads$', rest_dispatch,
         {'POST': 'zerver.views.upload.upload_file_backend'}),
+
+    # bot_storage -> zerver.views.storage
+    url(r'^bot_storage$', rest_dispatch,
+        {'PUT': 'zerver.views.storage.update_storage',
+         'GET': 'zerver.views.storage.get_storage',
+         'DELETE': 'zerver.views.storage.remove_storage'}),
 
     # users/me -> zerver.views
     url(r'^users/me$', rest_dispatch,
@@ -213,6 +229,15 @@ v1_api_and_json_patterns = [
     url(r'^users/me/android_gcm_reg_id$', rest_dispatch,
         {'POST': 'zerver.views.push_notifications.add_android_reg_id',
          'DELETE': 'zerver.views.push_notifications.remove_android_reg_id'}),
+
+    # user_groups -> zerver.views.user_groups
+    url(r'^user_groups/create$', rest_dispatch,
+        {'POST': 'zerver.views.user_groups.add_user_group'}),
+    url(r'^user_groups/(?P<user_group_id>\d+)$', rest_dispatch,
+        {'PATCH': 'zerver.views.user_groups.edit_user_group',
+         'DELETE': 'zerver.views.user_groups.delete_user_group'}),
+    url(r'^user_groups/(?P<user_group_id>\d+)/members$', rest_dispatch,
+        {'POST': 'zerver.views.user_groups.update_user_group_backend'}),
 
     # users/me -> zerver.views.user_settings
     url(r'^users/me/api_key/regenerate$', rest_dispatch,
@@ -273,6 +298,13 @@ v1_api_and_json_patterns = [
     url(r'^default_streams$', rest_dispatch,
         {'POST': 'zerver.views.streams.add_default_stream',
          'DELETE': 'zerver.views.streams.remove_default_stream'}),
+    url(r'^default_stream_groups/create$', rest_dispatch,
+        {'POST': 'zerver.views.streams.create_default_stream_group'}),
+    url(r'^default_stream_groups/(?P<group_id>\d+)$', rest_dispatch,
+        {'PATCH': 'zerver.views.streams.update_default_stream_group_info',
+         'DELETE': 'zerver.views.streams.remove_default_stream_group'}),
+    url(r'^default_stream_groups/(?P<group_id>\d+)/streams$', rest_dispatch,
+        {'PATCH': 'zerver.views.streams.update_default_stream_group_streams'}),
     # GET lists your streams, POST bulk adds, PATCH bulk modifies/removes
     url(r'^users/me/subscriptions$', rest_dispatch,
         {'GET': 'zerver.views.streams.list_subscriptions_backend',
@@ -344,11 +376,8 @@ i18n_urls = [
         zerver.views.zephyr.webathena_kerberos_login,
         name='zerver.views.zephyr.webathena_kerberos_login'),
 
-    url(r'^accounts/password/reset/$', password_reset,
-        {'post_reset_redirect': '/accounts/password/reset/done/',
-         'template_name': 'zerver/reset.html',
-         'password_reset_form': zerver.forms.ZulipPasswordResetForm,
-         }, name='django.contrib.auth.views.password_reset'),
+    url(r'^accounts/password/reset/$', zerver.views.auth.password_reset,
+        name='zerver.views.auth.password_reset'),
     url(r'^accounts/password/reset/done/$', password_reset_done,
         {'template_name': 'zerver/reset_emailed.html'}),
     url(r'^accounts/password/reset/(?P<uidb64>[0-9A-Za-z]+)/(?P<token>.+)/$',
@@ -381,7 +410,8 @@ i18n_urls = [
     url(r'^accounts/register/', zerver.views.registration.accounts_register,
         name='zerver.views.registration.accounts_register'),
     url(r'^accounts/do_confirm/(?P<confirmation_key>[\w]+)',
-        confirmation.views.confirm, name='confirmation.views.confirm'),
+        zerver.views.registration.check_prereg_key_and_redirect,
+        name='check_prereg_key_and_redirect'),
 
     url(r'^accounts/confirm_new_email/(?P<confirmation_key>[\w]+)',
         zerver.views.user_settings.confirm_email_change,
@@ -417,7 +447,7 @@ i18n_urls = [
         name='zerver.views.registration.accounts_home_from_multiuse_invite'),
 
     # API and integrations documentation
-    url(r'^api/$', APIView.as_view(template_name='zerver/api.html')),
+
     url(r'^api/endpoints/$', zerver.views.integrations.api_endpoint_docs,
         name='zerver.views.integrations.api_endpoint_docs'),
     url(r'^integrations/doc-html/(?P<integration_name>[^/]*)$',
@@ -438,6 +468,7 @@ i18n_urls = [
     url(r'^for/companies/$', TemplateView.as_view(template_name='zerver/for-companies.html')),
     url(r'^for/working-groups-and-communities/$',
         TemplateView.as_view(template_name='zerver/for-working-groups-and-communities.html')),
+    url(r'^for/mystery-hunt/$', TemplateView.as_view(template_name='zerver/for-mystery-hunt.html')),
 
     # Terms of Service and privacy pages.
     url(r'^terms/$', TemplateView.as_view(template_name='zerver/terms.html'), name='terms'),
@@ -547,9 +578,13 @@ urls += [url(r'^', include('social_django.urls', namespace='social'))]
 urls += [url(r'^help/(?P<article>.*)$',
              MarkdownDirectoryView.as_view(template_name='zerver/help/main.html',
                                            path_template='/zerver/help/%s.md'))]
-urls += [url(r'^api-new/(?P<article>[-\w]*\/?)$',
+urls += [url(r'^api/(?P<article>[-\w]*\/?)$',
              MarkdownDirectoryView.as_view(template_name='zerver/api/main.html',
                                            path_template='/zerver/api/%s.md'))]
+
+# Two Factor urls
+if settings.TWO_FACTOR_AUTHENTICATION_ENABLED:
+    urls += [url(r'', include(tf_urls + tf_twilio_urls, namespace='two_factor'))]
 
 if settings.DEVELOPMENT:
     urls += dev_urls.urls

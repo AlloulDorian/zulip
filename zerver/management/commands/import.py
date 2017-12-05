@@ -1,17 +1,18 @@
 
-from django.core.management import call_command
-from django.core.management.base import BaseCommand, CommandParser
-from django.conf import settings
-
-from zerver.models import Realm, Stream, UserProfile, Recipient, Subscription, \
-    Message, UserMessage, Huddle, DefaultStream, RealmDomain, RealmFilter, Client
-from zerver.lib.export import do_import_realm
-
 import argparse
 import os
 import subprocess
-
 from typing import Any
+
+from django.conf import settings
+from django.core.management import call_command
+from django.core.management.base import BaseCommand, CommandParser
+
+from zerver.lib.export import do_import_realm
+from zerver.models import Client, DefaultStream, Huddle, \
+    Message, Realm, RealmDomain, RealmFilter, Recipient, \
+    Stream, Subscription, UserMessage, UserProfile
+
 Model = Any  # TODO: make this mypy type more specific
 
 class Command(BaseCommand):
@@ -43,7 +44,8 @@ import a database dump from one or more JSON files."""
         if count:
             print("Zulip instance is not empty, found %d rows in %s table. "
                   % (count, model._meta.db_table))
-            print("You may use --destroy-rebuild-database to destroy and rebuild the database prior to import.")
+            print("You may use --destroy-rebuild-database to destroy and "
+                  "rebuild the database prior to import.")
             exit(1)
 
     def do_destroy_and_rebuild_database(self, db_name: str) -> None:
@@ -70,3 +72,7 @@ import a database dump from one or more JSON files."""
 
             print("Processing dump: %s ..." % (path,))
             do_import_realm(path)
+            if options["destroy_rebuild_database"]:
+                print("Resetting auto-increment sequence for Postgres......")
+                subprocess.check_call([os.path.join(settings.DEPLOY_ROOT,
+                                      "scripts/setup/postgres-reset-sequences")])

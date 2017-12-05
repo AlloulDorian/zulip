@@ -1,4 +1,4 @@
-# Documented in http://zulip.readthedocs.io/en/latest/queuing.html
+# Documented in https://zulip.readthedocs.io/en/latest/subsystems/queuing.html
 from typing import Any, Callable, Dict, List, Mapping, Optional, cast
 
 import signal
@@ -26,12 +26,13 @@ from zerver.lib.push_notifications import handle_push_notification
 from zerver.lib.actions import do_send_confirmation_email, \
     do_update_user_activity, do_update_user_activity_interval, do_update_user_presence, \
     internal_send_message, check_send_message, extract_recipients, \
-    render_incoming_message, do_update_embedded_data
+    render_incoming_message, do_update_embedded_data, do_mark_stream_messages_as_read
 from zerver.lib.url_preview import preview as url_preview
 from zerver.lib.digest import handle_digest_email
 from zerver.lib.send_email import send_future_email, send_email_from_dict, \
     FromAddress, EmailNotDeliveredException
 from zerver.lib.email_mirror import process_message as mirror_email
+from zerver.lib.streams import access_stream_by_id
 from zerver.decorator import JsonableError
 from zerver.tornado.socket import req_redis_key, respond_send_message
 from confirmation.models import Confirmation, create_confirmation_link
@@ -142,7 +143,7 @@ class QueueProcessingWorker:
         except Exception:
             self._log_problem()
             if not os.path.exists(settings.QUEUE_ERROR_DIR):
-                os.mkdir(settings.QUEUE_ERROR_DIR)
+                os.mkdir(settings.QUEUE_ERROR_DIR)  # nocoverage
             fname = '%s.errors' % (self.queue_name,)
             fn = os.path.join(settings.QUEUE_ERROR_DIR, fname)
             line = u'%s\t%s\n' % (time.asctime(), ujson.dumps(data))
@@ -170,6 +171,26 @@ class QueueProcessingWorker:
     def stop(self):
         # type: () -> None
         self.q.stop_consuming()
+
+class LoopQueueProcessingWorker(QueueProcessingWorker):
+    sleep_delay = 0
+
+    def start(self) -> None:  # nocoverage
+        while True:
+            # TODO: Probably it'd be better to share code with consume_wrapper()
+            events = self.q.drain_queue(self.queue_name, json=True)
+            try:
+                self.consume_batch(events)
+            finally:
+                reset_queries()
+            time.sleep(self.sleep_delay)
+
+    def consume_batch(self, event: List[Dict[str, Any]]) -> None:
+        raise NotImplementedError
+
+    def consume(self, event: Dict[str, Any]) -> None:
+        """In LoopQueueProcessingWorker, consume is used just for automated tests"""
+        self.consume_batch([event])
 
 @assign_queue('signups')
 class SignupWorker(QueueProcessingWorker):
@@ -250,24 +271,20 @@ class UserPresenceWorker(QueueProcessingWorker):
         do_update_user_presence(user_profile, client, log_time, status)
 
 @assign_queue('missedmessage_emails', queue_type="loop")
-class MissedMessageWorker(QueueProcessingWorker):
-    def start(self):
-        # type: () -> None
-        while True:
-            missed_events = self.q.drain_queue("missedmessage_emails", json=True)
-            by_recipient = defaultdict(list)  # type: Dict[int, List[Dict[str, Any]]]
+class MissedMessageWorker(LoopQueueProcessingWorker):
+    # Aggregate all messages received every 2 minutes to let someone finish sending a batch
+    # of messages
+    sleep_delay = 2 * 60
 
-            for event in missed_events:
-                logging.debug("Received missedmessage_emails event: %s" % (event,))
-                by_recipient[event['user_profile_id']].append(event)
+    def consume_batch(self, missed_events: List[Dict[str, Any]]) -> None:
+        by_recipient = defaultdict(list)  # type: Dict[int, List[Dict[str, Any]]]
 
-            for user_profile_id, events in by_recipient.items():
-                handle_missedmessage_emails(user_profile_id, events)
+        for event in missed_events:
+            logging.debug("Received missedmessage_emails event: %s" % (event,))
+            by_recipient[event['user_profile_id']].append(event)
 
-            reset_queries()
-            # Aggregate all messages received every 2 minutes to let someone finish sending a batch
-            # of messages
-            time.sleep(2 * 60)
+        for user_profile_id, events in by_recipient.items():
+            handle_missedmessage_emails(user_profile_id, events)
 
 @assign_queue('missedmessage_email_senders')
 class MissedMessageSendingWorker(QueueProcessingWorker):
@@ -303,18 +320,12 @@ class ErrorReporter(QueueProcessingWorker):
             do_report_error(event['report']['host'], event['type'], event['report'])
 
 @assign_queue('slow_queries', queue_type="loop")
-class SlowQueryWorker(QueueProcessingWorker):
-    def start(self):
-        # type: () -> None
-        while True:
-            self.process_one_batch()
-            # Aggregate all slow query messages in 1-minute chunks to avoid message spam
-            time.sleep(1 * 60)
+class SlowQueryWorker(LoopQueueProcessingWorker):
+    # Sleep 1 minute between checking the queue
+    sleep_delay = 60 * 1
 
-    def process_one_batch(self):
-        # type: () -> None
-        slow_queries = self.q.drain_queue("slow_queries", json=True)
-
+    def consume_batch(self, slow_queries):
+        # type: (List[Dict[str, Any]]) -> None
         for query in slow_queries:
             logging.info("Slow query: %s" % (query))
 
@@ -331,8 +342,6 @@ class SlowQueryWorker(QueueProcessingWorker):
             error_bot_realm = get_system_bot(settings.ERROR_BOT).realm
             internal_send_message(error_bot_realm, settings.ERROR_BOT,
                                   "stream", "logs", topic, content)
-
-        reset_queries()
 
 @assign_queue("message_sender")
 class MessageSenderWorker(QueueProcessingWorker):
@@ -498,5 +507,19 @@ class EmbeddedBotWorker(QueueProcessingWorker):
                 continue
             bot_handler.handle_message(
                 message=message,
-                bot_handler=self.get_bot_api_client(user_profile),
-                state_handler=None)
+                bot_handler=self.get_bot_api_client(user_profile)
+            )
+
+@assign_queue('deferred_work')
+class DeferredWorker(QueueProcessingWorker):
+    def consume(self, event: Mapping[str, Any]) -> None:
+        if event['type'] == 'mark_stream_messages_as_read':
+            user_profile = get_user_profile_by_id(event['user_profile_id'])
+
+            for stream_id in event['stream_ids']:
+                # Since the user just unsubscribed, we don't require
+                # an active Subscription object (otherwise, private
+                # streams would never be accessible)
+                (stream, recipient, sub) = access_stream_by_id(user_profile, stream_id,
+                                                               require_active=False)
+                do_mark_stream_messages_as_read(user_profile, stream)

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-from mock import patch, MagicMock
 from typing import Optional, Text
+
+from mock import MagicMock, patch
 
 from zerver.lib.test_classes import WebhookTestCase
 
@@ -269,6 +270,14 @@ class Bitbucket2HookTests(WebhookTestCase):
         # type: (MagicMock) -> None
         self.url = self.build_webhook_url(branches='changes,devlopment')
         payload = self.get_body('push_multiple_committers_with_others')
+        result = self.client_post(self.url, payload, content_type="application/json")
+        self.assertFalse(check_send_stream_message_mock.called)
+        self.assert_json_success(result)
+
+    @patch('zerver.webhooks.bitbucket2.view.check_send_stream_message')
+    def test_bitbucket2_on_push_without_changes_ignore(self, check_send_stream_message_mock):
+        # type: (MagicMock) -> None
+        payload = self.get_body('push_without_changes')
         result = self.client_post(self.url, payload, content_type="application/json")
         self.assertFalse(check_send_stream_message_mock.called)
         self.assert_json_success(result)

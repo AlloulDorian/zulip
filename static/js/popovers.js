@@ -100,6 +100,7 @@ function show_user_info_popover(element, user, message) {
             narrowed: narrow_state.active(),
             private_message_class: "respond_personal_button",
             is_active: people.is_active_user_for_popover(user.user_id),
+            is_bot: people.get_person_from_user_id(user.user_id).is_bot,
         };
 
         var ypos = elt.offset().top;
@@ -348,6 +349,15 @@ exports.register_click_handlers = function () {
         show_user_info_popover(this, user, message);
     });
 
+    $("#main_div").on("click", ".user-mention", function (e) {
+        var row = $(this).closest(".message_row");
+        e.stopPropagation();
+        var message = current_msg_list.get(rows.id(row));
+        var id = $(this).attr('data-user-id');
+        var user = people.get_person_from_user_id(id);
+        show_user_info_popover(this, user, message);
+    });
+
     $('body').on('click', '.user_popover .narrow_to_private_messages', function (e) {
         var user_id = $(e.target).parents('ul').attr('data-user-id');
         var email = people.get_person_from_user_id(user_id).email;
@@ -380,7 +390,7 @@ exports.register_click_handlers = function () {
         var user_id = $(e.target).parents('ul').attr('data-user-id');
         compose_actions.start('stream', {trigger: 'sidebar user actions'});
         var name = people.get_person_from_user_id(user_id).full_name;
-        var textarea = $("#new_message_content");
+        var textarea = $("#compose-textarea");
         textarea.val('@**' + name + '** ');
         popovers.hide_user_sidebar_popover();
         e.stopPropagation();
@@ -409,7 +419,7 @@ exports.register_click_handlers = function () {
         compose_actions.respond_to_message({trigger: 'user sidebar popover'});
         var user_id = $(e.target).parents('ul').attr('data-user-id');
         var name = people.get_person_from_user_id(user_id).full_name;
-        var textarea = $("#new_message_content");
+        var textarea = $("#compose-textarea");
         textarea.val('@**' + name + '** ');
         popovers.hide_message_info_popover();
         e.stopPropagation();
@@ -449,6 +459,7 @@ exports.register_click_handlers = function () {
             sent_by_uri: narrow.by_sender_uri(user_email),
             private_message_class: "compose_private_message",
             is_active: people.is_active_user_for_popover(user_id),
+            is_bot: user.is_bot,
         };
 
         target.popover({
@@ -469,7 +480,7 @@ exports.register_click_handlers = function () {
     });
 
     $('body').on('click', '.respond_button', function (e) {
-        var textarea = $("#new_message_content");
+        var textarea = $("#compose-textarea");
         var msgid = $(e.currentTarget).data("message-id");
 
         compose_actions.respond_to_message({trigger: 'popover respond'});
@@ -482,7 +493,7 @@ exports.register_click_handlers = function () {
                 } else {
                     textarea.val(textarea.val() + "\n```quote\n" + data.raw_content +"\n```\n");
                 }
-                $("#new_message_content").trigger("autosize.resize");
+                $("#compose-textarea").trigger("autosize.resize");
             },
         });
         popovers.hide_actions_popover();
@@ -490,7 +501,11 @@ exports.register_click_handlers = function () {
         e.preventDefault();
     });
     $('body').on('click', '.respond_personal_button', function (e) {
-        compose_actions.respond_to_message({reply_type: 'personal', trigger: 'popover respond pm'});
+        var user_id = $(e.target).parents('ul').attr('data-user-id');
+        var email = people.get_person_from_user_id(user_id).email;
+        compose_actions.start('private', {
+            trigger: 'popover send private',
+            private_message_recipient: email});
         popovers.hide_all();
         e.stopPropagation();
         e.preventDefault();
@@ -602,9 +617,11 @@ exports.register_click_handlers = function () {
 
 exports.any_active = function () {
     // True if any popover (that this module manages) is currently shown.
+    // Expanded sidebars on mobile view count as popovers as well.
     return popovers.actions_popped() || user_sidebar_popped() ||
         stream_popover.stream_popped() || stream_popover.topic_popped() ||
-        message_info_popped() || emoji_picker.reactions_popped();
+        message_info_popped() || emoji_picker.reactions_popped() ||
+        $("[class^='column-'].expanded").length;
 };
 
 exports.hide_all = function () {

@@ -78,6 +78,7 @@ var keypress_mappings = {
     80: {name: 'narrow_private', message_view_only: true}, // 'P'
     82: {name: 'respond_to_author', message_view_only: true}, // 'R'
     83: {name: 'narrow_by_subject', message_view_only: true}, //'S'
+    84: {name: 'toggle_night_mode', message_view_only: false}, // 'T'
     86: {name: 'view_selected_stream', message_view_only: false}, //'V'
     99: {name: 'compose', message_view_only: true}, // 'c'
     100: {name: 'open_drafts', message_view_only: true}, // 'd'
@@ -133,10 +134,20 @@ exports.get_keypress_hotkey = function (e) {
     return keypress_mappings[e.which];
 };
 
-exports.processing_text = function () {
-    var selector = 'input:focus,select:focus,textarea:focus,#compose-send-button:focus,.editable-section:focus';
-    return $(selector).length > 0;
-};
+exports.processing_text = (function () {
+    var selector = [
+        'input:focus',
+        'select:focus',
+        'textarea:focus',
+        '#compose-send-button:focus',
+        '.editable-section:focus',
+        '.pill-container div:focus',
+    ].join(",");
+
+    return function () {
+        return $(selector).length > 0;
+    };
+}());
 
 exports.is_editing_stream_name = function (e) {
     return $(e.target).is(".editable-section");
@@ -207,6 +218,12 @@ exports.process_escape_key = function (e) {
         }
 
         if (compose_state.composing()) {
+            // Check for errors in compose box; close errors if they exist
+            if ($("#compose-send-status").css('display') !== 'none') {
+                $("#compose-send-status").hide();
+                return true;
+            }
+
             // If the user hit the escape key, cancel the current compose
             compose_actions.cancel();
             return true;
@@ -520,11 +537,11 @@ exports.process_hotkey = function (e, hotkey) {
             compose_actions.cancel();
             // don't return, as we still want it to be picked up by the code below
         } else if (event_name === "page_up") {
-            $("#new_message_content").caret(0);
+            $("#compose-textarea").caret(0);
             return true;
         } else if (event_name === "page_down") {
             // so that it always goes to the end of the compose box.
-            $("#new_message_content").caret(Infinity);
+            $("#compose-textarea").caret(Infinity);
             return true;
         } else {
             // Let the browser handle the key normally.
@@ -570,6 +587,9 @@ exports.process_hotkey = function (e, hotkey) {
 
     // Shortcuts that don't require a message
     switch (event_name) {
+        case 'toggle_night_mode':
+            settings_display.set_night_mode(!page_params.night_mode);
+            return true;
         case 'compose': // 'c': compose
             compose_actions.start('stream', {trigger: "compose_hotkey"});
             return true;
@@ -707,6 +727,7 @@ exports.process_keydown = function (e) {
     if (!hotkey) {
         return false;
     }
+
     return exports.process_hotkey(e, hotkey);
 };
 
@@ -724,6 +745,7 @@ exports.process_keypress = function (e) {
     if (!hotkey) {
         return false;
     }
+
     return exports.process_hotkey(e, hotkey);
 };
 

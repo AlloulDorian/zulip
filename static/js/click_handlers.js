@@ -178,9 +178,9 @@ $(function () {
 
     $("#main_div").on("click", ".message_reaction", function (e) {
         e.stopPropagation();
-        var emoji_name = $(this).attr('data-emoji-name');
+        var local_id = $(this).attr('data-reaction-id');
         var message_id = rows.get_message_id(this);
-        reactions.toggle_emoji_reaction(message_id, emoji_name);
+        reactions.process_reaction_click(message_id, local_id);
     });
 
     $("#main_div").on("click", "a.stream", function (e) {
@@ -363,7 +363,7 @@ $(function () {
 
     // HOME
 
-    // Capture both the left-sidebar Home click and the tab breadcrumb Home
+    // Capture both the left-sidebar All Messages click and the tab breadcrumb All Messages
     $(document).on('click', ".home-link[data-name='home']", function (e) {
         ui_util.change_tab_to('#home');
         narrow.deactivate();
@@ -421,8 +421,8 @@ $(function () {
 
     // NB: This just binds to current elements, and won't bind to elements
     // created after ready() is called.
-    $('#send-status .send-status-close').click(
-        function () { $('#send-status').stop(true).fadeOut(500); }
+    $('#compose-send-status .compose-send-status-close').click(
+        function () { $('#compose-send-status').stop(true).fadeOut(500); }
     );
 
 
@@ -730,7 +730,7 @@ $(function () {
         if (compose_state.composing()) {
             if ($(e.target).is("a")) {
                 // Refocus compose message text box if link is clicked
-                $("#new_message_content").focus();
+                $("#compose-textarea").focus();
             } else if (!$(e.target).closest(".overlay").length &&
             !window.getSelection().toString() &&
             !$(e.target).closest('.popover-content').length) {
@@ -812,7 +812,7 @@ $(function () {
                         $("li[data-section='organization-profile']").click();
                     }
                 } else {
-                    $("li:not(.admin)").show();
+                    $(".settings-list li:not(.admin)").show();
                     if (!payload.dont_switch_tab) {
                         $("li[data-section='your-account']").click();
                     }

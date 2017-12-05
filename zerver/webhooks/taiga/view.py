@@ -18,18 +18,17 @@ value should always be in bold; otherwise the subject of US/task
 should be in bold.
 """
 
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Text
+from typing import Any, Dict, List, Mapping, Optional, Text, Tuple
 
-from django.utils.translation import ugettext as _
+import ujson
 from django.http import HttpRequest, HttpResponse
+from django.utils.translation import ugettext as _
 
 from zerver.decorator import api_key_only_webhook_view
 from zerver.lib.actions import check_send_stream_message
-from zerver.lib.response import json_success, json_error
 from zerver.lib.request import REQ, has_request_variables
+from zerver.lib.response import json_error, json_success
 from zerver.models import UserProfile
-
-import ujson
 
 @api_key_only_webhook_view('Taiga')
 @has_request_variables
@@ -109,7 +108,8 @@ templates = {
         'blocked': u':lock: %(user)s blocked task **%(subject)s**.',
         'unblocked': u':unlock: %(user)s unblocked task **%(subject)s**.',
         'set_milestone': u':calendar: %(user)s added task **%(subject)s** to sprint %(new)s.',
-        'changed_milestone': u':calendar: %(user)s changed sprint of task **%(subject)s** from %(old)s to %(new)s.',
+        'changed_milestone': u':calendar: %(user)s changed sprint of task '
+                             '**%(subject)s** from %(old)s to %(new)s.',
         'changed_status': u':chart_with_upwards_trend: %(user)s changed status of task **%(subject)s**'
         ' from %(old)s to %(new)s.',
         'renamed': u':notebook: %(user)s renamed task %(old)s to **%(new)s**.',
@@ -124,8 +124,10 @@ templates = {
         'unset_assigned_to': u':busts_in_silhouette: %(user)s unassigned issue **%(subject)s**.',
         'changed_assigned_to': u':busts_in_silhouette: %(user)s reassigned issue **%(subject)s**'
         ' from %(old)s to %(new)s.',
-        'changed_priority': u':rocket: %(user)s changed priority of issue **%(subject)s** from %(old)s to %(new)s.',
-        'changed_severity': u':warning: %(user)s changed severity of issue **%(subject)s** from %(old)s to %(new)s.',
+        'changed_priority': u':rocket: %(user)s changed priority of issue '
+                            '**%(subject)s** from %(old)s to %(new)s.',
+        'changed_severity': u':warning: %(user)s changed severity of issue '
+                            '**%(subject)s** from %(old)s to %(new)s.',
         'changed_status': u':chart_with_upwards_trend: %(user)s changed status of issue **%(subject)s**'
                            ' from %(old)s to %(new)s.',
         'changed_type': u':bulb: %(user)s changed type of issue **%(subject)s** from %(old)s to %(new)s.',

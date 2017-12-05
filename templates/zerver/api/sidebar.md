@@ -1,21 +1,21 @@
 ## REST API
 
-* [Installation instructions](/api-new/installation-instructions)
-* [API keys](/api-new/api-keys)
-* [Usage](/api-new/usage)
+* [Installation instructions](/api/installation-instructions)
+* [API keys](/api/api-keys)
+* [Usage](/api/usage)
 
 ## Integrations
 
-* [Overview](https://zulip.readthedocs.io/en/latest/integration-guide.html)
+* [Overview](/api/integration-guide)
 * [Existing integrations](/integrations)
 
 ## Writing webhook integrations
 
-* [Overview](https://zulip.readthedocs.io/en/latest/integration-guide.html#webhook-integrations)
-* [Walkthrough](https://zulip.readthedocs.io/en/latest/webhook-walkthrough.html)
-* [Documenting integrations](https://zulip.readthedocs.io/en/latest/integration-docs-guide.html)
+* [Overview](/api/integration-guide#webhook-integrations)
+* [Walkthrough](/api/webhook-walkthrough)
+* [Documenting integrations](/api/integration-docs-guide)
 
 ## Interactive bots (experimental)
 
-* [Running bots](https://zulip.readthedocs.io/en/latest/running-bots-guide.html)
-* [Writing bots](https://zulip.readthedocs.io/en/latest/writing-bots-guide.html)
+* [Running bots](/api/running-bots)
+* [Writing bots](/api/writing-bots)

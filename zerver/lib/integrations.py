@@ -61,7 +61,6 @@ class Integration:
         self.secondary_line_text = secondary_line_text
         self.legacy = legacy
         self.doc = doc
-        self.doc_context = None  # type: Optional[Dict[Any, Any]]
 
         for category in categories:
             if category not in CATEGORIES:
@@ -83,16 +82,10 @@ class Integration:
             stream_name = self.name
         self.stream_name = stream_name
 
-    def is_enabled(self):
-        # type: () -> bool
+    def is_enabled(self) -> bool:
         return True
 
-    def add_doc_context(self, context):
-        # type: (Dict[Any, Any]) -> None
-        self.doc_context = context
-
-    def get_logo_url(self):
-        # type: () -> Optional[str]
+    def get_logo_url(self) -> Optional[str]:
         logo_file_path_svg = str(pathlib.PurePath(
             settings.STATIC_ROOT,
             *self.DEFAULT_LOGO_STATIC_PATH_SVG.format(name=self.name).split('/')[1:]
@@ -144,8 +137,7 @@ class BotIntegration(Integration):
         self.doc = doc
 
 class EmailIntegration(Integration):
-    def is_enabled(self):
-        # type: () -> bool
+    def is_enabled(self) -> bool:
         return settings.EMAIL_GATEWAY_PATTERN != ""
 
 class WebhookIntegration(Integration):
@@ -188,25 +180,28 @@ class WebhookIntegration(Integration):
         self.doc = doc
 
     @property
-    def url_object(self):
-        # type: () -> LocaleRegexProvider
+    def url_object(self) -> LocaleRegexProvider:
         return url(self.url, self.function)
 
-class HubotLozenge(Integration):
+class HubotIntegration(Integration):
     GIT_URL_TEMPLATE = "https://github.com/hubot-scripts/hubot-{}"
 
-    def __init__(self, name, categories, display_name=None, logo=None, logo_alt=None, git_url=None, legacy=False):
-        # type: (str, List[str], Optional[str], Optional[str], Optional[str], Optional[str], Optional[bool]) -> None
+    def __init__(self, name: str, categories: List[str],
+                 display_name: Optional[str]=None, logo: Optional[str]=None,
+                 logo_alt: Optional[str]=None, git_url: Optional[str]=None,
+                 legacy: bool=False) -> None:
         if logo_alt is None:
             logo_alt = "{} logo".format(name.title())
         self.logo_alt = logo_alt
 
         if git_url is None:
             git_url = self.GIT_URL_TEMPLATE.format(name)
-        self.git_url = git_url
+        self.hubot_docs_url = git_url
+
         super().__init__(
             name, name, categories,
             logo=logo, display_name=display_name,
+            doc = 'zerver/integrations/hubot_common.md',
             legacy=legacy
         )
 
@@ -235,8 +230,7 @@ class GithubIntegration(WebhookIntegration):
         )
 
     @property
-    def url_object(self):
-        # type: () -> None
+    def url_object(self) -> None:
         return
 
 class EmbeddedBotIntegration(Integration):
@@ -246,8 +240,7 @@ class EmbeddedBotIntegration(Integration):
     '''
     DEFAULT_CLIENT_NAME = 'Zulip{name}EmbeddedBot'
 
-    def __init__(self, name, *args, **kwargs):
-        # type: (str, *Any, **Any) -> None
+    def __init__(self, name: str, *args: Any, **kwargs: Any) -> None:
         assert kwargs.get("client_name") is None
         client_name = self.DEFAULT_CLIENT_NAME.format(name=name.title())
         super().__init__(
@@ -372,7 +365,8 @@ INTEGRATIONS = {
                              doc='zerver/integrations/discourse.md'),
     'email': EmailIntegration('email', 'email', ['communication'],
                               doc='zerver/integrations/email.md'),
-    'errbot': Integration('errbot', 'errbot', ['meta-integration', 'bots'], doc='zerver/integrations/errbot.md'),
+    'errbot': Integration('errbot', 'errbot', ['meta-integration', 'bots'],
+                          doc='zerver/integrations/errbot.md'),
     'git': Integration('git', 'git', ['version-control'], doc='zerver/integrations/git.md'),
     'google-calendar': Integration(
         'google-calendar',
@@ -422,8 +416,10 @@ INTEGRATIONS = {
     'phabricator': Integration('phabricator', 'phabricator', ['version-control'],
                                doc='zerver/integrations/phabricator.md'),
     'puppet': Integration('puppet', 'puppet', ['deployment'], doc='zerver/integrations/puppet.md'),
-    'redmine': Integration('redmine', 'redmine', ['project-management'], doc='zerver/integrations/redmine.md'),
-    'rss': Integration('rss', 'rss', ['communication'], display_name='RSS', doc='zerver/integrations/rss.md'),
+    'redmine': Integration('redmine', 'redmine', ['project-management'],
+                           doc='zerver/integrations/redmine.md'),
+    'rss': Integration('rss', 'rss', ['communication'],
+                       display_name='RSS', doc='zerver/integrations/rss.md'),
     'svn': Integration('svn', 'svn', ['version-control'], doc='zerver/integrations/svn.md'),
     'trac': Integration('trac', 'trac', ['project-management'], doc='zerver/integrations/trac.md'),
     'trello-plugin': Integration(
@@ -444,26 +440,37 @@ INTEGRATIONS = {
 BOT_INTEGRATIONS = [
     BotIntegration('github_detail', ['version-control', 'bots'],
                    display_name='GitHub Detail'),
-    BotIntegration('googlesearch', ['bots'], display_name='Google Search'),
     BotIntegration('xkcd', ['bots', 'misc'], display_name='xkcd'),
 ]  # type: List[BotIntegration]
 
-HUBOT_LOZENGES = {
-    'assembla': HubotLozenge('assembla', ['project-management', 'version-control']),
-    'bonusly': HubotLozenge('bonusly', ['hr']),
-    'chartbeat': HubotLozenge('chartbeat', ['marketing']),
-    'darksky': HubotLozenge('darksky', ['misc'], display_name='Dark Sky', logo_alt='Dark Sky logo'),
-    'hangouts': HubotLozenge('google-hangouts', ['communication'], display_name="Hangouts"),
-    'instagram': HubotLozenge('instagram', ['misc'], logo='static/images/integrations/logos/instagram.png'),
-    'mailchimp': HubotLozenge('mailchimp', ['communication', 'marketing'],
-                              display_name='MailChimp', logo_alt='MailChimp logo'),
-    'translate': HubotLozenge('google-translate', ['misc'],
-                              display_name="Translate", logo_alt='Google Translate logo'),
-    'youtube': HubotLozenge('youtube', ['misc'], display_name='YouTube', logo_alt='YouTube logo')
+# Note: These are not actually displayed anywhere; we're keeping them
+# around so they can be migrated into the newer HUBOT_INTEGRATIONS
+HUBOT_INTEGRATIONS_LEGACY = {
+    'bonusly': HubotIntegration('bonusly', ['hr']),
+    'chartbeat': HubotIntegration('chartbeat', ['marketing']),
+    'darksky': HubotIntegration('darksky', ['misc'], display_name='Dark Sky',
+                                logo_alt='Dark Sky logo'),
+    'hangouts': HubotIntegration('google-hangouts', ['communication'], display_name="Hangouts"),
+    'instagram': HubotIntegration('instagram', ['misc'],
+                                  logo='static/images/integrations/logos/instagram.png'),
+    'mailchimp': HubotIntegration('mailchimp', ['communication', 'marketing'],
+                                  display_name='MailChimp', logo_alt='MailChimp logo'),
+    'translate': HubotIntegration('google-translate', ['misc'],
+                                  display_name="Translate", logo_alt='Google Translate logo'),
+    'youtube': HubotIntegration('youtube', ['misc'], display_name='YouTube',
+                                logo_alt='YouTube logo')
 }
 
-for integration in WEBHOOK_INTEGRATIONS:
-    INTEGRATIONS[integration.name] = integration
+HUBOT_INTEGRATIONS = {
+    HubotIntegration('assembla', ['version-control', 'project-management'],
+                     display_name='Assembla', logo_alt='Assembla'),
+}
+
+for hubot_integration in HUBOT_INTEGRATIONS:
+    INTEGRATIONS[hubot_integration.name] = hubot_integration
+
+for webhook_integration in WEBHOOK_INTEGRATIONS:
+    INTEGRATIONS[webhook_integration.name] = webhook_integration
 
 for bot_integration in BOT_INTEGRATIONS:
     INTEGRATIONS[bot_integration.name] = bot_integration

@@ -1,28 +1,26 @@
 
-from django.utils.translation import ugettext as _
-from django.utils import timezone
-from django.http import HttpResponse, HttpRequest
+from typing import Any, Dict, Optional, Text, Union, cast
 
-from zilencer.models import RemotePushDeviceToken, RemoteZulipServer
+from django.http import HttpRequest, HttpResponse
+from django.utils import timezone
+from django.utils.translation import ugettext as _
 
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.push_notifications import send_android_push_notification, \
     send_apple_push_notification
+from zerver.lib.request import REQ, has_request_variables
 from zerver.lib.response import json_error, json_success
-from zerver.lib.request import has_request_variables, REQ
 from zerver.lib.validator import check_int
 from zerver.models import UserProfile
 from zerver.views.push_notifications import validate_token
+from zilencer.models import RemotePushDeviceToken, RemoteZulipServer
 
-from typing import Any, Dict, Optional, Union, Text, cast
-
-def validate_entity(entity):
-    # type: (Union[UserProfile, RemoteZulipServer]) -> None
+def validate_entity(entity: Union[UserProfile, RemoteZulipServer]) -> None:
     if not isinstance(entity, RemoteZulipServer):
         raise JsonableError(_("Must validate with valid Zulip server API key"))
 
-def validate_bouncer_token_request(entity, token, kind):
-    # type: (Union[UserProfile, RemoteZulipServer], bytes, int) -> None
+def validate_bouncer_token_request(entity: Union[UserProfile, RemoteZulipServer],
+                                   token: bytes, kind: int) -> None:
     if kind not in [RemotePushDeviceToken.APNS, RemotePushDeviceToken.GCM]:
         raise JsonableError(_("Invalid token type"))
     validate_entity(entity)

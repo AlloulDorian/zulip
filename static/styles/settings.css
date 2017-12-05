@@ -150,7 +150,7 @@ label {
     vertical-align: middle;
 }
 
-#settings_content table + .progressive-table-wrapper table tr td:first-of-type {
+#settings_content table + .progressive-table-wrapper table tr.user_row td:first-of-type {
     width: 20%;
 }
 
@@ -206,8 +206,8 @@ td .button {
 .settings-section .table-striped thead th {
     background-color: inherit;
     color: inherit;
-    border-top: 1px solid hsl(0, 0%, 86%) !important;
-    border-bottom: 1px solid hsl(0, 0%, 86%) !important;
+    border-top: 1px solid hsla(0, 0%, 0%, 0.2) !important;
+    border-bottom: 1px solid hsla(0, 0%, 0%, 0.2) !important;
 }
 
 #admin-user-list .table tr:first-of-type td,
@@ -254,10 +254,11 @@ td .button {
     font-family: FontAwesome, "Yantramanav", Source Sans Pro;
     font-weight: 600;
 }
+
 .dynamic-input {
     display: inline-block;
     padding: 5px;
-    background-color: #FFF;
+    background-color: hsl(0, 0%, 100%);
     border: 1px solid hsl(0, 0%, 80%);
     border-radius: 3px;
     transition: box-shadow 0.3s ease;
@@ -362,7 +363,7 @@ input[type=checkbox].inline-block {
     height: 40px;
 
     font-weight: 600;
-    color: #fff;
+    color: hsl(0, 0%, 100%);
 
     background: -webkit-linear-gradient(-45deg, hsl(168, 53%, 52%), hsl(168, 69%, 67%));
     background: linear-gradient(-45deg, hsl(168, 53%, 52%), hsl(168, 69%, 67%));
@@ -414,7 +415,7 @@ input[type=checkbox].inline-block {
 #attachments_list .attachment-messages .ind-message .message-id {
     padding: 1px 4px 1px 4px;
     background-color: hsl(0, 0%, 66%);
-    color: #fff;
+    color: hsl(0, 0%, 100%);
 }
 
 #attachments_list .attachment-messages .ind-message:hover {
@@ -468,7 +469,6 @@ input[type=checkbox].inline-block {
 }
 
 @media (max-width: 480px) {
-
     #pw_strength {
         margin: auto;
     }
@@ -508,18 +508,19 @@ input[type=checkbox].inline-block {
         margin: auto;
         text-align: center;
     }
-
 }
 
 #organization .settings-section .settings-section-icon,
 #settings .settings-section .settings-section-icon {
     margin-right: 8px;
 }
+
 #notification-settings .notification-reminder {
     text-align: left;
 }
 
-#realm_notifications_stream_label > button {
+#realm_notifications_stream_label > button,
+#realm_signup_notifications_stream_label > button {
     margin: 0px 5px;
 }
 
@@ -588,7 +589,7 @@ input[type=checkbox].inline-block {
 }
 
 .add-new-emoji-box #emoji-file-name {
-    color: #aaa;
+    color: hsl(0, 0%, 66%);
 }
 
 .add-new-filter-box button {
@@ -686,7 +687,7 @@ input[type=checkbox].inline-block {
     max-height: 220px;
     margin: 5px;
 
-    background-color: #fff;
+    background-color: hsl(0, 0%, 100%);
     border: 1px solid hsl(0, 0%, 86%);
     border-radius: 4px;
     box-sizing: border-box;
@@ -803,7 +804,7 @@ input[type=checkbox].inline-block {
 #attachments_list {
     list-style-type: none;
     margin: auto;
-    background-color: #fff;
+    background-color: hsl(0, 0%, 100%);
 }
 
 #alert_words_list {
@@ -837,6 +838,40 @@ input[type=checkbox].inline-block {
     white-space: normal;
 }
 
+.emojiset_choices {
+    width: 250px;
+    margin-top: 10px;
+    padding: 0px 10px;
+}
+
+.emojiset_choices .emoji {
+    height: 22px;
+    width: 22px;
+}
+
+.emojiset_choices label {
+    border-bottom: 1px solid hsla(0, 0%, 0%, 0.2);
+    padding: 8px 0px 10px 0px;
+}
+
+.emojiset_choices label:last-of-type {
+    border-bottom: none;
+}
+
+.emojiset_choices label input[type=radio] {
+    position: relative;
+    top: -2px;
+    margin: 0px 5px 0px 0px;
+}
+
+.emojiset_choices label input[type=radio]:checked + span {
+    font-weight: 600;
+}
+
+.emojiset_choices .right {
+    float: right;
+}
+
 .open-user-form {
     min-width: initial !important;
 }
@@ -865,13 +900,13 @@ input[type=checkbox].inline-block {
     text-decoration: none;
     margin-right: 5px;
 }
+
 /* -- new settings overlay -- */
 #settings_page {
     height: 95vh;
     width: 97vw;
     max-width: 1024px;
     margin: 2.5vh auto;
-    background-color: #fff;
     overflow: hidden;
     border-radius: 4px;
 
@@ -892,7 +927,6 @@ input[type=checkbox].inline-block {
 }
 
 #settings_page .sidebar .tab-container {
-    background-color: #fff;
     padding: 6px;
     border-bottom: 1px solid hsl(0, 0%, 86%);
 }
@@ -918,7 +952,8 @@ input[type=checkbox].inline-block {
 
 #settings_page .content-wrapper .settings-header h1 .section {
     font-weight: 400;
-    color: hsl(0, 0%, 40%);
+    color: inherit;
+    opacity: 0.6;
 }
 
 #settings_page .settings-header.mobile {
@@ -942,13 +977,12 @@ input[type=checkbox].inline-block {
     overflow-y: auto;
     overflow-x: hidden;
 
-    background-color: hsl(0, 0%, 98%);
+    background-color: hsla(0, 0%, 0%, 0.02);
 }
 
 #settings_page .table-striped thead th {
     background-color: inherit;
     color: inherit;
-    opacity: 0.5;
 }
 
 #settings_page .table-striped thead th.active {
@@ -987,7 +1021,7 @@ input[type=checkbox].inline-block {
     width: 300px;
     height: calc(100% - 45px);
 
-    background-color: #fff;
+    background-color: hsl(0, 0%, 100%);
     border-left: 1px solid hsl(0, 0%, 86%);
 
     pointer-events: none;
@@ -1081,7 +1115,6 @@ input[type=checkbox].inline-block {
     cursor: pointer;
 }
 
-
 #deactivation_user_modal.fade.in {
     top: calc(50% - 120px);
 }
@@ -1093,11 +1126,13 @@ input[type=checkbox].inline-block {
     border-radius: 0px;
 }
 
-#id_realm_notifications_stream .dropdown-search > input[type=text] {
+#id_realm_notifications_stream .dropdown-search > input[type=text],
+#id_realm_signup_notifications_stream .dropdown-search > input[type=text] {
     margin: 9px;
 }
 
-#id_realm_notifications_stream .dropdown-list-body {
+#id_realm_notifications_stream .dropdown-list-body,
+#id_realm_signup_notifications_stream .dropdown-list-body {
     position: relative;
     height: auto;
     max-height: 200px;
@@ -1201,7 +1236,7 @@ input[type=text]#settings_search {
     position: absolute;
     bottom: 0px;
 }
-/* -- end new settings overlay -- */
+
 @media (max-width: 953px) {
     .user-avatar-section,
     .realm-icon-section {

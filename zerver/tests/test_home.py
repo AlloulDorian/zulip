@@ -23,8 +23,7 @@ from zerver.models import (
 from zerver.views.home import home, sent_time_in_epoch_seconds
 
 class HomeTest(ZulipTestCase):
-    def test_home(self):
-        # type: () -> None
+    def test_home(self) -> None:
 
         # Keep this list sorted!!!
         html_bits = [
@@ -49,6 +48,7 @@ class HomeTest(ZulipTestCase):
             "avatar_source",
             "avatar_url",
             "avatar_url_medium",
+            "bot_types",
             "can_create_streams",
             "cross_realm_bots",
             "custom_profile_fields",
@@ -68,6 +68,7 @@ class HomeTest(ZulipTestCase):
             "enable_online_push_notifications",
             "enable_sounds",
             "enable_stream_desktop_notifications",
+            "enable_stream_email_notifications",
             "enable_stream_push_notifications",
             "enable_stream_sounds",
             "enter_sends",
@@ -94,6 +95,7 @@ class HomeTest(ZulipTestCase):
             "narrow_stream",
             "needs_tutorial",
             "never_subscribed",
+            "night_mode",
             "password_min_guesses",
             "password_min_length",
             "pm_content_in_desktop_notifications",
@@ -111,6 +113,7 @@ class HomeTest(ZulipTestCase):
             "realm_bots",
             "realm_create_stream_by_admins_only",
             "realm_default_language",
+            "realm_default_stream_groups",
             "realm_default_streams",
             "realm_description",
             "realm_domains",
@@ -137,7 +140,9 @@ class HomeTest(ZulipTestCase):
             "realm_presence_disabled",
             "realm_restricted_to_domain",
             "realm_show_digest_email",
+            "realm_signup_notifications_stream_id",
             "realm_uri",
+            "realm_user_groups",
             "realm_users",
             "realm_waiting_period_threshold",
             "root_domain_uri",
@@ -179,8 +184,8 @@ class HomeTest(ZulipTestCase):
             with patch('zerver.lib.cache.cache_set') as cache_mock:
                 result = self._get_home_page(stream='Denmark')
 
-        self.assert_length(queries, 40)
-        self.assert_length(cache_mock.call_args_list, 10)
+        self.assert_length(queries, 41)
+        self.assert_length(cache_mock.call_args_list, 7)
 
         html = result.content.decode('utf-8')
 
@@ -214,8 +219,7 @@ class HomeTest(ZulipTestCase):
         self.assertEqual(realm_bots_actual_keys, realm_bots_expected_keys)
 
     @slow("Creates and subscribes 10 users in a loop.  Should use bulk queries.")
-    def test_num_queries_with_streams(self):
-        # type: () -> None
+    def test_num_queries_with_streams(self) -> None:
         main_user = self.example_user('hamlet')
         other_user = self.example_user('cordelia')
 
@@ -244,22 +248,20 @@ class HomeTest(ZulipTestCase):
         with queries_captured() as queries2:
             result = self._get_home_page()
 
-        self.assert_length(queries2, 34)
+        self.assert_length(queries2, 35)
 
         # Do a sanity check that our new streams were in the payload.
         html = result.content.decode('utf-8')
         self.assertIn('test_stream_7', html)
 
-    def _get_home_page(self, **kwargs):
-        # type: (**Any) -> HttpResponse
+    def _get_home_page(self, **kwargs: Any) -> HttpResponse:
         with \
                 patch('zerver.lib.events.request_event_queue', return_value=42), \
                 patch('zerver.lib.events.get_user_events', return_value=[]):
             result = self.client_get('/', dict(**kwargs))
         return result
 
-    def _get_page_params(self, result):
-        # type: (HttpResponse) -> Dict[str, Any]
+    def _get_page_params(self, result: HttpResponse) -> Dict[str, Any]:
         html = result.content.decode('utf-8')
         lines = html.split('\n')
         page_params_line = [l for l in lines if l.startswith('var page_params')][0]
@@ -267,8 +269,7 @@ class HomeTest(ZulipTestCase):
         page_params = ujson.loads(page_params_json)
         return page_params
 
-    def _sanity_check(self, result):
-        # type: (HttpResponse) -> None
+    def _sanity_check(self, result: HttpResponse) -> None:
         '''
         Use this for tests that are geared toward specific edge cases, but
         which still want the home page to load properly.
@@ -277,8 +278,7 @@ class HomeTest(ZulipTestCase):
         if 'Compose your message' not in html:
             raise AssertionError('Home page probably did not load.')
 
-    def test_terms_of_service(self):
-        # type: () -> None
+    def test_terms_of_service(self) -> None:
         user = self.example_user('hamlet')
         email = user.email
         self.login(email)
@@ -296,8 +296,7 @@ class HomeTest(ZulipTestCase):
             html = result.content.decode('utf-8')
             self.assertIn('There are new Terms of Service', html)
 
-    def test_terms_of_service_first_time_template(self):
-        # type: () -> None
+    def test_terms_of_service_first_time_template(self) -> None:
         user = self.example_user('hamlet')
         email = user.email
         self.login(email)
@@ -313,8 +312,7 @@ class HomeTest(ZulipTestCase):
             self.assert_in_response("I agree to the", result)
             self.assert_in_response("most productive group chat", result)
 
-    def test_accept_terms_of_service(self):
-        # type: () -> None
+    def test_accept_terms_of_service(self) -> None:
         email = self.example_email("hamlet")
         self.login(email)
 
@@ -326,8 +324,7 @@ class HomeTest(ZulipTestCase):
         self.assertEqual(result.status_code, 302)
         self.assertEqual(result['Location'], '/')
 
-    def test_bad_narrow(self):
-        # type: () -> None
+    def test_bad_narrow(self) -> None:
         email = self.example_email("hamlet")
         self.login(email)
         with patch('logging.exception') as mock:
@@ -335,8 +332,7 @@ class HomeTest(ZulipTestCase):
         mock.assert_called_once_with('Narrow parsing')
         self._sanity_check(result)
 
-    def test_bad_pointer(self):
-        # type: () -> None
+    def test_bad_pointer(self) -> None:
         user_profile = self.example_user('hamlet')
         email = user_profile.email
         user_profile.pointer = 999999
@@ -348,8 +344,7 @@ class HomeTest(ZulipTestCase):
         mock.assert_called_once_with('hamlet@zulip.com has invalid pointer 999999')
         self._sanity_check(result)
 
-    def test_topic_narrow(self):
-        # type: () -> None
+    def test_topic_narrow(self) -> None:
         email = self.example_email("hamlet")
         self.login(email)
         result = self._get_home_page(stream='Denmark', topic='lunch')
@@ -357,8 +352,7 @@ class HomeTest(ZulipTestCase):
         html = result.content.decode('utf-8')
         self.assertIn('lunch', html)
 
-    def test_notifications_stream(self):
-        # type: () -> None
+    def test_notifications_stream(self) -> None:
         email = self.example_email("hamlet")
         realm = get_realm('zulip')
         realm.notifications_stream_id = get_stream('Denmark', realm).id
@@ -368,8 +362,7 @@ class HomeTest(ZulipTestCase):
         page_params = self._get_page_params(result)
         self.assertEqual(page_params['realm_notifications_stream_id'], get_stream('Denmark', realm).id)
 
-    def create_bot(self, owner, bot_email, bot_name):
-        # type: (UserProfile, Text, Text) -> UserProfile
+    def create_bot(self, owner: UserProfile, bot_email: Text, bot_name: Text) -> UserProfile:
         user = do_create_user(
             email=bot_email,
             password='123',
@@ -381,8 +374,7 @@ class HomeTest(ZulipTestCase):
         )
         return user
 
-    def create_non_active_user(self, realm, email, name):
-        # type: (Realm, Text, Text) -> UserProfile
+    def create_non_active_user(self, realm: Realm, email: Text, name: Text) -> UserProfile:
         user = do_create_user(
             email=email,
             password='123',
@@ -398,9 +390,19 @@ class HomeTest(ZulipTestCase):
         user.save()
         return user
 
-    @slow('creating users and loading home page')
-    def test_people(self):
+    def test_signup_notifications_stream(self):
         # type: () -> None
+        email = self.example_email("hamlet")
+        realm = get_realm('zulip')
+        realm.signup_notifications_stream = get_stream('Denmark', realm)
+        realm.save()
+        self.login(email)
+        result = self._get_home_page()
+        page_params = self._get_page_params(result)
+        self.assertEqual(page_params['realm_signup_notifications_stream_id'], get_stream('Denmark', realm).id)
+
+    @slow('creating users and loading home page')
+    def test_people(self) -> None:
         hamlet = self.example_user('hamlet')
         realm = get_realm('zulip')
         self.login(hamlet.email)
@@ -468,12 +470,28 @@ class HomeTest(ZulipTestCase):
         self.assertNotIn('defunct-1@zulip.com', active_emails)
 
         cross_bots = page_params['cross_realm_bots']
-        self.assertEqual(len(cross_bots), 3)
+        self.assertEqual(len(cross_bots), 5)
         cross_bots.sort(key=lambda d: d['email'])
 
         notification_bot = self.notification_bot()
 
-        self.assertEqual(cross_bots, [
+        by_email = lambda d: d['email']
+
+        self.assertEqual(sorted(cross_bots, key=by_email), sorted([
+            dict(
+                user_id=get_user('new-user-bot@zulip.com', get_realm('zulip')).id,
+                is_admin=False,
+                email='new-user-bot@zulip.com',
+                full_name='Zulip New User Bot',
+                is_bot=True
+            ),
+            dict(
+                user_id=get_user('emailgateway@zulip.com', get_realm('zulip')).id,
+                is_admin=False,
+                email='emailgateway@zulip.com',
+                full_name='Email Gateway',
+                is_bot=True
+            ),
             dict(
                 user_id=get_user('feedback@zulip.com', get_realm('zulip')).id,
                 is_admin=False,
@@ -495,10 +513,9 @@ class HomeTest(ZulipTestCase):
                 full_name='Welcome Bot',
                 is_bot=True
             ),
-        ])
+        ], key=by_email))
 
-    def test_new_stream(self):
-        # type: () -> None
+    def test_new_stream(self) -> None:
         user_profile = self.example_user("hamlet")
         stream_name = 'New stream'
         self.subscribe(user_profile, stream_name)
@@ -511,8 +528,7 @@ class HomeTest(ZulipTestCase):
         self.assertEqual(page_params['max_message_id'], -1)
         self.assertEqual(page_params['have_initial_messages'], False)
 
-    def test_invites_by_admins_only(self):
-        # type: () -> None
+    def test_invites_by_admins_only(self) -> None:
         user_profile = self.example_user('hamlet')
         email = user_profile.email
 
@@ -532,8 +548,7 @@ class HomeTest(ZulipTestCase):
         html = result.content.decode('utf-8')
         self.assertIn('Invite more users', html)
 
-    def test_desktop_home(self):
-        # type: () -> None
+    def test_desktop_home(self) -> None:
         email = self.example_email("hamlet")
         self.login(email)
         result = self.client_get("/desktop_home")
@@ -544,8 +559,7 @@ class HomeTest(ZulipTestCase):
         path = urllib.parse.urlparse(result['Location']).path
         self.assertEqual(path, "/")
 
-    def test_apps_view(self):
-        # type: () -> None
+    def test_apps_view(self) -> None:
         result = self.client_get('/apps')
         self.assertEqual(result.status_code, 301)
         self.assertTrue(result['Location'].endswith('/apps/'))
@@ -561,23 +575,20 @@ class HomeTest(ZulipTestCase):
         html = result.content.decode('utf-8')
         self.assertIn('Apps for every platform.', html)
 
-    def test_generate_204(self):
-        # type: () -> None
+    def test_generate_204(self) -> None:
         email = self.example_email("hamlet")
         self.login(email)
         result = self.client_get("/api/v1/generate_204")
         self.assertEqual(result.status_code, 204)
 
-    def test_message_sent_time(self):
-        # type: () -> None
+    def test_message_sent_time(self) -> None:
         epoch_seconds = 1490472096
         pub_date = datetime.datetime.fromtimestamp(epoch_seconds)
         user_message = MagicMock()
         user_message.message.pub_date = pub_date
         self.assertEqual(sent_time_in_epoch_seconds(user_message), epoch_seconds)
 
-    def test_handlebars_compile_error(self):
-        # type: () -> None
+    def test_handlebars_compile_error(self) -> None:
         request = HostRequestMock()
         with self.settings(DEVELOPMENT=True):
             with patch('os.path.exists', return_value=True):
@@ -585,8 +596,7 @@ class HomeTest(ZulipTestCase):
         self.assertEqual(result.status_code, 500)
         self.assert_in_response('Error compiling handlebars templates.', result)
 
-    def test_subdomain_homepage(self):
-        # type: () -> None
+    def test_subdomain_homepage(self) -> None:
         email = self.example_email("hamlet")
         self.login(email)
         with self.settings(ROOT_DOMAIN_LANDING_PAGE=True):
@@ -599,21 +609,18 @@ class HomeTest(ZulipTestCase):
                 result = self._get_home_page()
             self._sanity_check(result)
 
-    def send_test_message(self, content, sender_name='iago',
-                          stream_name='Denmark', topic_name='foo'):
-        # type: (str, str, str, str) -> None
+    def send_test_message(self, content: str, sender_name: str='iago',
+                          stream_name: str='Denmark', topic_name: str='foo') -> None:
         sender = self.example_email(sender_name)
         self.send_stream_message(sender, stream_name,
                                  content=content, topic_name=topic_name)
 
-    def soft_activate_and_get_unread_count(self, stream='Denmark', topic='foo'):
-        # type: (str, str) -> int
+    def soft_activate_and_get_unread_count(self, stream: str='Denmark', topic: str='foo') -> int:
         stream_narrow = self._get_home_page(stream=stream, topic=topic)
         page_params = self._get_page_params(stream_narrow)
         return page_params['unread_msgs']['count']
 
-    def test_unread_count_user_soft_deactivation(self):
-        # type: () -> None
+    def test_unread_count_user_soft_deactivation(self) -> None:
         # In this test we make sure if a soft deactivated user had unread
         # messages before deactivation they remain same way after activation.
         long_term_idle_user = self.example_user('hamlet')
@@ -643,8 +650,7 @@ class HomeTest(ZulipTestCase):
         self.assertEqual(idle_user_msg_list[-1].content, message)
 
     @slow("Loads home page data several times testing different cases")
-    def test_multiple_user_soft_deactivations(self):
-        # type: () -> None
+    def test_multiple_user_soft_deactivations(self) -> None:
         long_term_idle_user = self.example_user('hamlet')
         # We are sending this message to ensure that long_term_idle_user has
         # at least one UserMessage row.
